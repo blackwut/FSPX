@@ -30,3 +30,19 @@
 *.exe
 *.out
 *.app
+
+# Xilinx HLS
+.ipcache/
+.run/
+.Xil/
+_x/
+main
+*.xclbin
+*.xclbin.*
+*.xo
+*.xo.*
+*.log
+*.protoinst
+*.wcfg
+*.wdb
+emconfig.json
