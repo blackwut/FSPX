@@ -1,6 +1,8 @@
 #ifndef __STREAM_HPP__
 #define __STREAM_HPP__
 
+#include "hls_stream.h"
+#include "../common.hpp"
 
 namespace fx {
 // Constants for axi functions
@@ -30,8 +32,52 @@ struct stream
     hls::stream<bool> e_data;
 
     stream() {
-        #pragma HLS STREAM variable=data   depth=depth
-        #pragma HLS STREAM variable=e_data depth=depth
+        #pragma HLS stream variable=data   depth=depth
+        #pragma HLS stream variable=e_data depth=depth
+    }
+
+    stream(const char * name) {
+        #pragma HLS stream variable=data   depth=depth
+        #pragma HLS stream variable=e_data depth=depth
+        data.set_name(name);
+        e_data.set_name(name);
+    }
+
+    T read()
+    {
+    #pragma HLS INLINE
+        return data.read();
+    }
+
+    void write(const T & v)
+    {
+    #pragma HLS INLINE
+        data.write(v);
+        e_data.write(false);
+    }
+
+    bool read_eos()
+    {
+    #pragma HLS INLINE
+        return e_data.read();
+    }
+
+    void write_eos()
+    {
+    #pragma HLS INLINE
+        e_data.write(true);
+    }
+
+    bool empty()
+    {
+    #pragma HLS INLINE
+        return data.empty();
+    }
+
+    bool full()
+    {
+    #pragma HLS INLINE
+        return data.full();
     }
 };
 
@@ -84,7 +130,7 @@ struct stream
 
 //         out.data.write((ap_uint<_WStrm>)t);
 //         out.e_data.write(false);
-        
+
 //         last = in.e_data.read();
 //     }
 //     out.e_data.write(true);
@@ -273,7 +319,7 @@ struct stream
 
 //         out.tag.write(t.getKey() % N);
 //         out.e_tag.write(false);
-        
+
 //         last = in.e_data.read();
 //     }
 //     out.e_data.write(true);

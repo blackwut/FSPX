@@ -2,7 +2,8 @@
 #define __FILTER_HPP__
 
 
-#include "stream.hpp"
+#include "../common.hpp"
+#include "../streams/stream.hpp"
 
 
 namespace fx {

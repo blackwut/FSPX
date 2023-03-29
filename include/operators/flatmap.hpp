@@ -1,15 +1,39 @@
-#ifndef __MAP_HPP__
-#define __MAP_HPP__
+#ifndef __FLATMAP_HPP__
+#define __FLATMAP_HPP__
 
 
-#include "stream.hpp"
+#include "../common.hpp"
+#include "../streams/stream.hpp"
 
 
 namespace fx {
 
 
+template <typename T_OUT>
+struct FlatMapShipper
+{
+    hls::stream<T_OUT> & data;
+    hls::stream<bool> & e_data;
+
+    FlatMapShipper(
+        hls::stream<T_OUT> & data,
+        hls::stream<bool> & e_data
+    )
+    : data(data)
+    , e_data(e_data)
+    {}
+
+    void send(T_OUT & out)
+    {
+    #pragma HLS INLINE
+        data.write(out);
+        e_data.write(false);
+    }
+};
+
+
 template <typename T_FUNC, typename T_IN, typename T_OUT = T_IN>
-void Map(
+void FlatMap(
     T_FUNC & func,
     hls::stream<T_IN> & istrm,
     hls::stream<bool> & e_istrm,
@@ -17,18 +41,17 @@ void Map(
     hls::stream<bool> & e_ostrm
 )
 {
+    static FlatMapShipper<T_OUT> shipper(ostrm, e_ostrm);
+
     bool last = e_istrm.read();
 
-MAIN_LOOP_MAP:
+MAIN_LOOP_FLATMAP:
     while (!last) {
     #pragma HLS PIPELINE II = 1
     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
         T_IN in = istrm.read();
-        T_OUT out;
-        func(in, out);
-        
-        ostrm.write(out);
-        e_ostrm.write(false);
+        func(in, shipper);
+
         last = e_istrm.read();
     }
     e_ostrm.write(true);
@@ -36,14 +59,14 @@ MAIN_LOOP_MAP:
 
 
 template <typename T_FUNC, typename T_IN, typename T_OUT = T_IN>
-void Map(
+void FlatMap(
     T_FUNC & func,
     fx::stream<T_IN> & istrm,
     fx::stream<T_OUT> & ostrm
 )
 {
 #pragma HLS INLINE
-    Map(
+    FlatMap(
         func,
         istrm.data, istrm.e_data,
         ostrm.data, ostrm.e_data
@@ -52,7 +75,7 @@ void Map(
 
 
 // template <int N, typename T_FUNC, typename T_IN, typename T_OUT = T_IN, int in_depth, int out_depth>
-// void process_map(
+// void process_flatmap(
 //     StreamN<T_IN, N, in_depth> & in,
 //     StreamN<T_OUT, N, out_depth> & out,
 //     T_FUNC func_array[N]
@@ -60,10 +83,10 @@ void Map(
 // {
 // #pragma HLS dataflow
 
-// PROCESS_MAP:
+// PROCESS_FLATMAP:
 //     for (int i = 0; i < N; ++i) {
 //     #pragma HLS unroll
-//         Map<T_FUNC, T_IN, T_OUT>(
+//         FlatMap<T_FUNC, T_IN, T_OUT>(
 //             func_array[i],
 //             in.data[i], in.e_data[i],
 //             out.data[i], out.e_data[i]
@@ -74,7 +97,7 @@ void Map(
 
 
 // template <int N, typename T_FUNC, typename T_IN, typename T_OUT = T_IN, int in_depth, int out_depth>
-// void process_map(
+// void process_flatmap(
 //     StreamN<T_IN, N, in_depth> & in,
 //     StreamN<T_OUT, N, out_depth> & out
 // )
@@ -83,10 +106,10 @@ void Map(
 
 //     T_FUNC func_array[N];
 
-// PROCESS_MAP:
+// PROCESS_FLATMAP:
 //     for (int i = 0; i < N; ++i) {
 // #pragma HLS unroll
-//         Map<T_FUNC, T_IN, T_OUT>(
+//         FlatMap<T_FUNC, T_IN, T_OUT>(
 //             func_array[i],
 //             in.data[i], in.e_data[i],
 //             out.data[i], out.e_data[i]
@@ -97,7 +120,7 @@ void Map(
 
 
 // template <int N, typename T_FUNC, typename T_IN, typename T_OUT = T_IN, int in_depth, int out_depth>
-// void Stream_to_Map_Tag(
+// void Stream_to_FlatMap_Tag(
 //     Stream<T_IN, in_depth> & in,
 //     Stream<T_OUT, out_depth> & out
 // )
@@ -119,7 +142,7 @@ void Map(
 //         xf::common::utils_hw::TagSelectT()
 //     );
 
-//     process_map<N, T_FUNC, T_IN, T_OUT>(
+//     process_flatmap<N, T_FUNC, T_IN, T_OUT>(
 //         tag_to_mpu,
 //         mpu_to_stream
 //     );
@@ -134,7 +157,7 @@ void Map(
 
 
 // template <int N, typename T_FUNC, typename T_IN, typename T_OUT = T_IN, int in_depth, int out_depth>
-// void Stream_to_Map_Tag(
+// void Stream_to_FlatMap_Tag(
 //     Stream<T_IN, in_depth> & in,
 //     Stream<T_OUT, out_depth> & out,
 //     T_FUNC func_array[N]
@@ -157,7 +180,7 @@ void Map(
 //         xf::common::utils_hw::TagSelectT()
 //     );
 
-//     process_map<N, T_FUNC, T_IN, T_OUT>(
+//     process_flatmap<N, T_FUNC, T_IN, T_OUT>(
 //         tag_to_mpu,
 //         mpu_to_stream,
 //         func_array
@@ -172,4 +195,4 @@ void Map(
 
 }
 
-#endif // __MAP_HPP__
+#endif // __FLATMAP_HPP__
