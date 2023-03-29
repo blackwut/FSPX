@@ -46,3 +46,24 @@ main
 *.wcfg
 *.wdb
 emconfig.json
+
+# vitis_hls
+Debug/
+.apc/
+.settings/
+# .autopilot/
+# build/
+# csim/
+# impl/
+# sim/
+# syn/
+
+# **/solution*/*
+# !**/solution*/*.tcl
+
+solution/
+
+.cproject
+.project
+.vitis_hls_log_all.xml
+kernel.xml
