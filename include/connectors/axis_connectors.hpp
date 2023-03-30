@@ -1,9 +1,10 @@
-#ifndef __STREAM_CONNECTORS_HPP__
-#define __STREAM_CONNECTORS_HPP__
+#ifndef __AXIS_CONNECTORS_HPP__
+#define __AXIS_CONNECTORS_HPP__
 
 
 #include "ap_int.h"
 #include "../common.hpp"
+#include "../streams/axis_stream.hpp"
 #include "../streams/stream.hpp"
 
 
@@ -11,20 +12,19 @@ namespace fx {
 
 template <typename T, int IN_DEPTH, int OUT_DEPTH>
 void StoS(
-    fx::stream<T, IN_DEPTH> & istrm,
-    fx::stream<T, OUT_DEPTH> & ostrm
+    fx::axis_stream<T, IN_DEPTH> & istrm,
+    fx::axis_stream<T, OUT_DEPTH> & ostrm
 )
 {
-    bool last = istrm.read_eos();
+    bool last = false;
+    T t = istrm.read(last);
 
 StoS:
     while (!last) {
     #pragma HLS PIPELINE II = 1
     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-        T t = istrm.read();
-        last = istrm.read_eos();
-
         ostrm.write(t);
+        t = istrm.read();
     }
     ostrm.write_eos();
 }
@@ -36,41 +36,10 @@ StoS:
 //
 //******************************************************************************
 
-// template <int N, typename T>
-// void StoSN(
-//     hls::stream<T> & istrm,
-//     hls::stream<bool> & e_istrm,
-//     hls::stream<T> ostrms[N],
-//     hls::stream<bool> e_ostrms[N],
-//     RoundRobin policy
-// )
-// {
-//     int id = 0;
-//     bool last = e_istrm.read();
-
-// StoSN:
-//     while (!last) {
-//     #pragma HLS PIPELINE II = 1
-//     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-//         T t = istrm.read();
-
-//         ostrms[id].write(t);
-//         e_ostrms[id].write(false);
-
-//         last = e_istrm.read();
-//         id = (id + 1 == N) ? 0 : (id + 1);
-//     }
-
-//     for (int i = 0; i < N; ++i) {
-//     #pragma HLS UNROLL
-//         e_ostrms[i].write(true);
-//     }
-// }
-
 template <int N, typename T, int IN_DEPTH, int OUT_DEPTH>
 void StoSN_RR(
-    fx::stream<T, IN_DEPTH> & istrm,
-    fx::stream<T, OUT_DEPTH> ostrms[N]
+    fx::axis_stream<T, IN_DEPTH> & istrm,
+    fx::axis_stream<T, OUT_DEPTH> ostrms[N]
 )
 {
     int id = 0;
@@ -96,8 +65,8 @@ StoSN_RoundRobin:
 
 template <int N, typename T, int IN_DEPTH, int OUT_DEPTH>
 void SNtoS_RR(
-    fx::stream<T, IN_DEPTH> istrms[N],
-    fx::stream<T, OUT_DEPTH> & ostrm
+    fx::axis_stream<T, IN_DEPTH> istrms[N],
+    fx::axis_stream<T, OUT_DEPTH> & ostrm
 )
 {
     int id = 0;
@@ -169,8 +138,8 @@ SNtoS_RoundRobin:
 
 template <int N, typename T, int IN_DEPTH, int OUT_DEPTH>
 void StoSN_LB(
-    fx::stream<T, IN_DEPTH> & istrm,
-    fx::stream<T, OUT_DEPTH> ostrms[N]
+    fx::axis_stream<T, IN_DEPTH> & istrm,
+    fx::axis_stream<T, OUT_DEPTH> ostrms[N]
 )
 {
     int id = 0;
@@ -196,8 +165,8 @@ StoSN_LoadBalancer:
 
 template <int N, typename T, int IN_DEPTH, int OUT_DEPTH>
 void SNtoS_LB(
-    fx::stream<T, IN_DEPTH> istrms[N],
-    fx::stream<T, OUT_DEPTH> & ostrm
+    fx::axis_stream<T, IN_DEPTH> istrms[N],
+    fx::axis_stream<T, OUT_DEPTH> & ostrm
 )
 {
     int id = 0;
@@ -269,8 +238,8 @@ SNtoS_LoadBalancer:
 
 template <int N, typename T, int IN_DEPTH, int OUT_DEPTH, typename T_KEY_EXTRACTOR>
 void StoSN_KB(
-    fx::stream<T, IN_DEPTH> & istrm,
-    fx::stream<T, OUT_DEPTH> ostrms[N],
+    fx::axis_stream<T, IN_DEPTH> & istrm,
+    fx::axis_stream<T, OUT_DEPTH> ostrms[N],
     T_KEY_EXTRACTOR && key_extractor
 )
 {
@@ -295,8 +264,8 @@ StoSN_KeyBy:
 
 template <int N, typename T, int IN_DEPTH, int OUT_DEPTH, typename T_KEY_GENERATOR>
 void SNtoS_KB(
-    fx::stream<T, IN_DEPTH> istrms[N],
-    fx::stream<T, OUT_DEPTH> & ostrm,
+    fx::axis_stream<T, IN_DEPTH> istrms[N],
+    fx::axis_stream<T, OUT_DEPTH> & ostrm,
     T_KEY_GENERATOR && key_generator
 )
 {
@@ -369,8 +338,8 @@ SNtoS_KeyBy:
 
 template <int N, typename T, int IN_DEPTH, int OUT_DEPTH>
 void StoSN_B(
-    fx::stream<T, IN_DEPTH> & istrm,
-    fx::stream<T, OUT_DEPTH> ostrms[N]
+    fx::axis_stream<T, IN_DEPTH> & istrm,
+    fx::axis_stream<T, OUT_DEPTH> ostrms[N]
 )
 {
     bool last = istrm.read_eos();
@@ -396,4 +365,4 @@ StoSN_Broadcast:
 
 }
 
-#endif // __STREAM_CONNECTORS_HPP__
+#endif // __AXIS_CONNECTORS_HPP__

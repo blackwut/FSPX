@@ -26,13 +26,13 @@ create_clock -period 300MHz -name default
 # Source x_hls.tcl to determine which steps to execute
 source directives.tcl
 
-# config_interface -m_axi_alignment_byte_size 64 -m_axi_latency 64 -m_axi_max_widen_bitwidth 512
-# config_rtl -register_reset_num 3
-# config_export -format ip_catalog -rtl verilog -vivado_clock 3
+config_interface -m_axi_alignment_byte_size 64 -m_axi_latency 64 -m_axi_max_widen_bitwidth 512
+config_rtl -register_reset_num 3
+config_export -format ip_catalog -rtl verilog -vivado_clock 3
 
-# csim_design -clean
-# csynth_design
-# cosim_design -enable_dataflow_profiling
-# export_design -flow syn -rtl verilog -format ip_catalog
+csim_design -clean -profile
+csynth_design
+cosim_design -enable_dataflow_profiling
+export_design -flow syn -rtl verilog -format ip_catalog
 
 exit

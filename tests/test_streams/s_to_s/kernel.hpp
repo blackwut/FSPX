@@ -1,6 +1,5 @@
 #include "../../../include/fspx.hpp"
 
-#define PAR      4
 #define SIZE    16
 
 using data_t = int;

@@ -3,7 +3,7 @@
 
 
 #include "../common.hpp"
-#include "../streams/stream.hpp"
+#include "../streams/streams.hpp"
 
 
 namespace fx {
