@@ -14,20 +14,19 @@ namespace fx {
 //     SRL
 // };
 
-template <typename T, int depth = 2>
+template <typename T, int DEPTH = 0>
 struct stream
 {
     hls::stream<T> data;
     hls::stream<bool> e_data;
 
     stream() {
-        #pragma HLS stream variable=data   depth=depth
-        #pragma HLS stream variable=e_data depth=depth
+        #pragma HLS STREAM variable=data   depth=DEPTH
+        #pragma HLS STREAM variable=e_data depth=DEPTH
     }
 
-    stream(const char * name) {
-        #pragma HLS stream variable=data   depth=depth
-        #pragma HLS stream variable=e_data depth=depth
+    stream(const char * name)
+    : stream<T, DEPTH>() {
         data.set_name(name);
         e_data.set_name(name);
     }

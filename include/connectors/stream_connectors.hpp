@@ -9,10 +9,10 @@
 
 namespace fx {
 
-template <typename T, int IN_DEPTH, int OUT_DEPTH>
+template <typename T, int DEPTH_IN, int DEPTH_OUT>
 void StoS(
-    fx::stream<T, IN_DEPTH> & istrm,
-    fx::stream<T, OUT_DEPTH> & ostrm
+    fx::stream<T, DEPTH_IN> & istrm,
+    fx::stream<T, DEPTH_OUT> & ostrm
 )
 {
     bool last = istrm.read_eos();
@@ -36,41 +36,10 @@ StoS:
 //
 //******************************************************************************
 
-// template <int N, typename T>
-// void StoSN(
-//     hls::stream<T> & istrm,
-//     hls::stream<bool> & e_istrm,
-//     hls::stream<T> ostrms[N],
-//     hls::stream<bool> e_ostrms[N],
-//     RoundRobin policy
-// )
-// {
-//     int id = 0;
-//     bool last = e_istrm.read();
-
-// StoSN:
-//     while (!last) {
-//     #pragma HLS PIPELINE II = 1
-//     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-//         T t = istrm.read();
-
-//         ostrms[id].write(t);
-//         e_ostrms[id].write(false);
-
-//         last = e_istrm.read();
-//         id = (id + 1 == N) ? 0 : (id + 1);
-//     }
-
-//     for (int i = 0; i < N; ++i) {
-//     #pragma HLS UNROLL
-//         e_ostrms[i].write(true);
-//     }
-// }
-
-template <int N, typename T, int IN_DEPTH, int OUT_DEPTH>
+template <int N, typename T, int DEPTH_IN, int DEPTH_OUT>
 void StoSN_RR(
-    fx::stream<T, IN_DEPTH> & istrm,
-    fx::stream<T, OUT_DEPTH> ostrms[N]
+    fx::stream<T, DEPTH_IN> & istrm,
+    fx::stream<T, DEPTH_OUT> ostrms[N]
 )
 {
     int id = 0;
@@ -85,7 +54,7 @@ StoSN_RoundRobin:
 
         ostrms[id].write(t);
 
-        id = ((id + 1) == N) ? 0 : (id + 1);
+        id = (id + 1 == N) ? 0 : (id + 1);
     }
 
     for (int i = 0; i < N; ++i) {
@@ -94,15 +63,15 @@ StoSN_RoundRobin:
     }
 }
 
-template <int N, typename T, int IN_DEPTH, int OUT_DEPTH>
+template <int N, typename T, int DEPTH_IN, int DEPTH_OUT>
 void SNtoS_RR(
-    fx::stream<T, IN_DEPTH> istrms[N],
-    fx::stream<T, OUT_DEPTH> & ostrm
+    fx::stream<T, DEPTH_IN> istrms[N],
+    fx::stream<T, DEPTH_OUT> & ostrm
 )
 {
     int id = 0;
     ap_uint<N> lasts = 0;
-    const ap_uint<N> ends = ~lasts;   // set all ones
+    const ap_uint<N> ends = ~lasts;   // set all bits to one
 
     for (int i = 0; i < N; ++i) {
     #pragma HLS UNROLL
@@ -134,43 +103,10 @@ SNtoS_RoundRobin:
 //
 //******************************************************************************
 
-// template <int N, typename T>
-// void StoSN(
-//     hls::stream<T> & istrm,
-//     hls::stream<bool> & e_istrm,
-//     hls::stream<T> ostrms[N],
-//     hls::stream<bool> e_ostrms[N],
-//     LoadBalancer policy
-// )
-// {
-//     int id = 0;
-//     bool last = e_istrm.read();
-
-// StoSN:
-//     while (!last) {
-//     #pragma HLS PIPELINE II = 1
-//     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-//         if (false == ostrms[id].full()) {
-//             T t = istrm.read();
-
-//             ostrms[id].write(t);
-//             e_ostrms[id].write(false);
-
-//             last = e_istrm.read();
-//         }
-//         id = (id + 1 == N) ? 0 : (id + 1);
-//     }
-
-//     for (int i = 0; i < N; ++i) {
-//     #pragma HLS UNROLL
-//         e_ostrms[i].write(true);
-//     }
-// }
-
-template <int N, typename T, int IN_DEPTH, int OUT_DEPTH>
+template <int N, typename T, int DEPTH_IN, int DEPTH_OUT>
 void StoSN_LB(
-    fx::stream<T, IN_DEPTH> & istrm,
-    fx::stream<T, OUT_DEPTH> ostrms[N]
+    fx::stream<T, DEPTH_IN> & istrm,
+    fx::stream<T, DEPTH_OUT> ostrms[N]
 )
 {
     int id = 0;
@@ -182,8 +118,9 @@ StoSN_LoadBalancer:
     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
         if (false == ostrms[id].full()) {
             T t = istrm.read();
-            ostrms[id].write(t);
             last = istrm.read_eos();
+
+            ostrms[id].write(t);
         }
         id = (id + 1 == N) ? 0 : (id + 1);
     }
@@ -194,15 +131,15 @@ StoSN_LoadBalancer:
     }
 }
 
-template <int N, typename T, int IN_DEPTH, int OUT_DEPTH>
+template <int N, typename T, int DEPTH_IN, int DEPTH_OUT>
 void SNtoS_LB(
-    fx::stream<T, IN_DEPTH> istrms[N],
-    fx::stream<T, OUT_DEPTH> & ostrm
+    fx::stream<T, DEPTH_IN> istrms[N],
+    fx::stream<T, DEPTH_OUT> & ostrm
 )
 {
     int id = 0;
     ap_uint<N> lasts = 0;
-    const ap_uint<N> ends = ~lasts;   // set all ones
+    const ap_uint<N> ends = ~lasts;   // set all bits to one
 
     for (int i = 0; i < N; ++i) {
     #pragma HLS UNROLL
@@ -230,48 +167,18 @@ SNtoS_LoadBalancer:
     ostrm.write_eos();
 }
 
+
 //******************************************************************************
 //
 // Key-By
 //
 //******************************************************************************
 
-// template <int N, typename T, typename T_KEY_EXTRACTOR>
-// void StoSN(
-//     hls::stream<T> & istrm,
-//     hls::stream<bool> & e_istrm,
-//     hls::stream<T> ostrms[N],
-//     hls::stream<bool> e_ostrms[N],
-//     KeyBy policy,
-//     T_KEY_EXTRACTOR && key_extractor
-// )
-// {
-//     bool last = e_istrm.read();
-
-// StoSN:
-//     while (!last) {
-//     #pragma HLS PIPELINE II = 1
-//     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-//         T t = istrm.read();
-//         int key = key_extractor(t);
-
-//         ostrms[key].write(t);
-//         e_ostrms[key].write(false);
-
-//         last = e_istrm.read();
-//     }
-
-//     for (int i = 0; i < N; ++i) {
-//     #pragma HLS UNROLL
-//         e_ostrms[i].write(true);
-//     }
-// }
-
-template <int N, typename T, int IN_DEPTH, int OUT_DEPTH, typename T_KEY_EXTRACTOR>
+template <int N, typename T, int DEPTH_IN, int DEPTH_OUT, typename KEY_EXTRACTOR_T>
 void StoSN_KB(
-    fx::stream<T, IN_DEPTH> & istrm,
-    fx::stream<T, OUT_DEPTH> ostrms[N],
-    T_KEY_EXTRACTOR && key_extractor
+    fx::stream<T, DEPTH_IN> & istrm,
+    fx::stream<T, DEPTH_OUT> ostrms[N],
+    KEY_EXTRACTOR_T && key_extractor
 )
 {
     bool last = istrm.read_eos();
@@ -282,8 +189,8 @@ StoSN_KeyBy:
     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
         T t = istrm.read();
         last = istrm.read_eos();
-        int key = key_extractor(t);
 
+        int key = key_extractor(t);
         ostrms[key].write(t);
     }
 
@@ -293,17 +200,17 @@ StoSN_KeyBy:
     }
 }
 
-template <int N, typename T, int IN_DEPTH, int OUT_DEPTH, typename T_KEY_GENERATOR>
+template <int N, typename T, int DEPTH_IN, int DEPTH_OUT, typename KEY_GENERATOR_T>
 void SNtoS_KB(
-    fx::stream<T, IN_DEPTH> istrms[N],
-    fx::stream<T, OUT_DEPTH> & ostrm,
-    T_KEY_GENERATOR && key_generator
+    fx::stream<T, DEPTH_IN> istrms[N],
+    fx::stream<T, DEPTH_OUT> & ostrm,
+    KEY_GENERATOR_T && key_generator
 )
 {
     int index = 0;
     int id = 0;
     ap_uint<N> lasts = 0;
-    const ap_uint<N> ends = ~lasts;   // set all ones
+    const ap_uint<N> ends = ~lasts;   // set all bits to one
 
     for (int i = 0; i < N; ++i) {
     #pragma HLS UNROLL
@@ -329,48 +236,17 @@ SNtoS_KeyBy:
     ostrm.write_eos();
 }
 
+
 //******************************************************************************
 //
 // Broadcast
 //
 //******************************************************************************
 
-// template <int N, typename T>
-// void StoSN(
-//     hls::stream<T> & istrm,
-//     hls::stream<bool> & e_istrm,
-//     hls::stream<T> ostrms[N],
-//     hls::stream<bool> e_ostrms[N],
-//     Broadcast policy
-// )
-// {
-//     bool last = e_istrm.read();
-
-// StoSN:
-//     while (!last) {
-//     #pragma HLS PIPELINE II = 1
-//     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-//         T t = istrm.read();
-
-//         for (int i = 0; i < N; ++i) {
-//         #pragma HLS UNROLL
-//             ostrms[i].write(t);
-//             e_ostrms[i].write(false);
-//         }
-
-//         last = e_istrm.read();
-//     }
-
-//     for (int i = 0; i < N; ++i) {
-//     #pragma HLS UNROLL
-//         e_ostrms[i].write(true);
-//     }
-// }
-
-template <int N, typename T, int IN_DEPTH, int OUT_DEPTH>
+template <int N, typename T, int DEPTH_IN, int DEPTH_OUT>
 void StoSN_B(
-    fx::stream<T, IN_DEPTH> & istrm,
-    fx::stream<T, OUT_DEPTH> ostrms[N]
+    fx::stream<T, DEPTH_IN> & istrm,
+    fx::stream<T, DEPTH_OUT> ostrms[N]
 )
 {
     bool last = istrm.read_eos();
