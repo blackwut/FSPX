@@ -1,30 +1,26 @@
 #ifndef __AXIS_STREAM_HPP__
 #define __AXIS_STREAM_HPP__
 
-#include "hls_stream.h"
 #include "ap_axi_sdata.h"
+#include "hls_stream.h"
 #include "../common.hpp"
 
 
 namespace fx {
 
-// enum class Storage {
-//     Unspecified,  // Let the tool decide
-//     BRAM,
-//     LUTRAM,
-//     SRL
-// };
-
-template <typename T, int depth = 2>
+template <typename T, int DEPTH = 0>
 struct axis_stream
 {
     using wrapper_t = hls::axis<T, 0, 0, 0>;
 
     hls::stream<wrapper_t> data;
 
-    axis_stream() {}
+    axis_stream() {
+        #pragma HLS INTERFACE mode=axis port=data depth=DEPTH
+    }
 
-    axis_stream(const char * name) {
+    axis_stream(const char * name)
+    : axis_stream<T, DEPTH>() {
         data.set_name(name);
     }
 
@@ -51,7 +47,7 @@ struct axis_stream
     #pragma HLS INLINE
         wrapper_t w;
         w.keep = -1;
-        w.last = false;
+        w.last = true;
         data.write(w);
     }
 
