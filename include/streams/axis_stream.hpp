@@ -16,7 +16,7 @@ struct axis_stream
     hls::stream<wrapper_t> data;
 
     axis_stream() {
-        #pragma HLS INTERFACE mode=axis port=data depth=DEPTH
+        #pragma HLS INTERFACE mode=axis port=data
     }
 
     axis_stream(const char * name)

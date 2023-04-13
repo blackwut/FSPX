@@ -11,7 +11,7 @@ open_project -reset test
 add_files kernel.cpp
 
 # Add test bench
-add_files -tb tb.cpp -cflags "-Wno-unknown-pragmas" -csimflags "-Wno-unknown-pragmas"
+add_files -tb tb.cpp -cflags "-std=c++14 -Wno-unknown-pragmas" -csimflags "-std=c++14 -Wno-unknown-pragmas"
 
 # Set the top-level function
 set_top test
@@ -31,8 +31,8 @@ config_rtl -register_reset_num 3
 config_export -format ip_catalog -rtl verilog -vivado_clock 3
 
 csim_design -clean -profile
-csynth_design
-cosim_design -enable_dataflow_profiling
-export_design -flow syn -rtl verilog -format ip_catalog
+# csynth_design
+# cosim_design -enable_dataflow_profiling
+# export_design -flow syn -rtl verilog -format ip_catalog
 
 exit

@@ -1,12 +1,31 @@
 #include "kernel.hpp"
 
-bool test_s_to_s()
+data_t new_data(int i)
+{
+    data_t d;
+    d.x[0] = i >> 24;
+    d.x[1] = i >> 16;
+    d.x[2] = i >> 8;
+    d.x[3] = i;
+    d.y[0] = i >> 16;
+    d.y[1] = i;
+    d.z = i;
+    return d;
+}
+
+bool check_data(const data_t & r, int i)
+{
+    data_t d = new_data(i);
+    return (d == r);
+}
+
+int test_s_to_s()
 {
     stream_t in;
     stream_t out;
 
     for (int i = 0; i < SIZE; ++i) {
-        in.write(i);
+        in.write(new_data(i));
     }
     in.write_eos();
 
@@ -15,23 +34,19 @@ bool test_s_to_s()
     int i = 0;
     bool last = out.read_eos();
     while (!last) {
-        int r = out.read();
+        data_t r = out.read();
         last = out.read_eos();
 
-        if (i != r) {
-            return false;
+        if (!check_data(r, i)) {
+            return 1;
         }
         ++i;
     }
 
-    return true;
+    return 0;
 }
 
 int main(int argc, char * argv[])
 {
-    int err = 0;
-    if (!test_s_to_s()) {
-        err = -1;
-    }
-    return err;
+    return test_s_to_s();
 }

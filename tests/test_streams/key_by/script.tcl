@@ -11,7 +11,7 @@ open_project -reset test
 add_files kernel.cpp
 
 # Add test bench
-add_files -tb tb.cpp -cflags "-Wno-unknown-pragmas" -csimflags "-Wno-unknown-pragmas"
+add_files -tb tb.cpp -cflags "-std=c++14 -Wno-unknown-pragmas" -csimflags "-std=c++14 -Wno-unknown-pragmas"
 
 # Set the top-level function
 set_top test

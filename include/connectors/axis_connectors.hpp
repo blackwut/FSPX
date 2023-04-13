@@ -32,7 +32,44 @@ void AtoA(
     bool last = false;
     T t = istrm.read(last);
 
-StoS:
+AtoA:
+    while (!last) {
+    #pragma HLS PIPELINE II = 1
+    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+        ostrm.write(t);
+        t = istrm.read(last);
+    }
+    ostrm.write_eos();
+}
+
+template <typename T, int DEPTH_IN, int DEPTH_OUT>
+void StoA(
+    fx::stream<T, DEPTH_IN> & istrm,
+    fx::axis_stream<T, DEPTH_OUT> & ostrm
+)
+{
+    bool last = istrm.read_eos();
+StoA:
+    while (!last) {
+    #pragma HLS PIPELINE II = 1
+    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+        T t = istrm.read();
+        last = istrm.read_eos();
+        ostrm.write(t);
+    }
+    ostrm.write_eos();
+}
+
+template <typename T, int DEPTH_IN, int DEPTH_OUT>
+void AtoS(
+    fx::axis_stream<T, DEPTH_IN> & istrm,
+    fx::stream<T, DEPTH_OUT> & ostrm
+)
+{
+    bool last = false;
+    T t = istrm.read(last);
+
+AtoS:
     while (!last) {
     #pragma HLS PIPELINE II = 1
     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
@@ -264,7 +301,7 @@ ANtoS_LoadBalancer:
         bool empty = istrms[id].empty();
 
         if (!last && !empty) {
-            ostrm.write(t);
+            ostrm.write(ts[id]);
 
             bool last = false;
             ts[id] = istrms[id].read(last);
@@ -403,7 +440,7 @@ ANtoS_KeyBy:
         index++;
 
         if (!lasts[id]) {
-            ostrm.write(t);
+            ostrm.write(ts[id]);
 
             bool last = false;
             ts[id] = istrms[id].read(last);

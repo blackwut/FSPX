@@ -9,50 +9,146 @@
 namespace fx {
 
 
-template <typename T_FUNC, typename T_IN, typename T_OUT = T_IN>
+template <typename T_IN, int DEPTH_IN, typename T_OUT, int DEPTH_OUT, typename FUNCTOR_T>
 void Filter(
-    T_FUNC & func,
-    hls::stream<T_IN> & istrm,
-    hls::stream<bool> & e_istrm,
-    hls::stream<T_OUT> & ostrm,
-    hls::stream<bool> & e_ostrm
+    fx::stream<T_IN, DEPTH_IN> & istrm,
+    fx::stream<T_OUT, DEPTH_OUT> & ostrm,
+    FUNCTOR_T && func
 )
 {
-    bool last = e_istrm.read();
+    bool last = istrm.read_eos();
 
-MAIN_LOOP_FILTER:
+Filter_StoS:
     while (!last) {
     #pragma HLS PIPELINE II = 1
     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
         T_IN in = istrm.read();
+        last = istrm.read_eos();
+
         T_OUT out;
-        bool result = func(in, out);
-
-        if (result) {
+        if (func(in, out)) {
             ostrm.write(out);
-            e_ostrm.write(false);
         }
-
-        last = e_istrm.read();
     }
-    e_ostrm.write(true);
+    ostrm.write_eos();
 }
 
-
-template <typename T_FUNC, typename T_IN, typename T_OUT = T_IN>
+template <typename T_IN, int DEPTH_IN, typename T_OUT, int DEPTH_OUT, typename FUNCTOR_T>
 void Filter(
-    T_FUNC & func,
-    fx::stream<T_IN> & istrm,
-    fx::stream<T_OUT> & ostrm
+    fx::axis_stream<T_IN, DEPTH_IN> & istrm,
+    fx::stream<T_OUT, DEPTH_OUT> & ostrm,
+    FUNCTOR_T && func
 )
 {
-#pragma HLS INLINE
-    Filter(
-        func,
-        istrm.data, istrm.e_data,
-        ostrm.data, ostrm.e_data
-    );
+    bool last = false;
+    T_IN in = istrm.read(last);
+
+Filter_AtoS:
+    while (!last) {
+    #pragma HLS PIPELINE II = 1
+    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+        T_OUT out;
+        if (func(in, out)) {
+            ostrm.write(out);
+        }
+
+        in = istrm.read(last);
+    }
+    ostrm.write_eos();
 }
+
+template <typename T_IN, int DEPTH_IN, typename T_OUT, int DEPTH_OUT, typename FUNCTOR_T>
+void Filter(
+    fx::stream<T_IN, DEPTH_IN> & istrm,
+    fx::axis_stream<T_OUT, DEPTH_OUT> & ostrm,
+    FUNCTOR_T && func
+)
+{
+    bool last = istrm.read_eos();
+
+Filter_StoA:
+    while (!last) {
+    #pragma HLS PIPELINE II = 1
+    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+        T_IN in = istrm.read();
+        last = istrm.read_eos();
+
+        T_OUT out;
+        if (func(in, out)) {
+            ostrm.write(out);
+        }
+    }
+    ostrm.write_eos();
+}
+
+template <typename T_IN, int DEPTH_IN, typename T_OUT, int DEPTH_OUT, typename FUNCTOR_T>
+void Filter(
+    fx::axis_stream<T_IN, DEPTH_IN> & istrm,
+    fx::axis_stream<T_OUT, DEPTH_OUT> & ostrm,
+    FUNCTOR_T && func
+)
+{
+    bool last = false;
+    T_IN in = istrm.read(last);
+
+Filter_AtoA:
+    while (!last) {
+    #pragma HLS PIPELINE II = 1
+    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+        T_OUT out;
+        if (func(in, out)) {
+            ostrm.write(out);
+        }
+
+        in = istrm.read(last);
+    }
+    ostrm.write_eos();
+}
+
+// template <typename T_FUNC, typename T_IN, typename T_OUT = T_IN>
+// void Filter(
+//     T_FUNC & func,
+//     hls::stream<T_IN> & istrm,
+//     hls::stream<bool> & e_istrm,
+//     hls::stream<T_OUT> & ostrm,
+//     hls::stream<bool> & e_ostrm
+// )
+// {
+//     bool last = e_istrm.read();
+
+// MAIN_LOOP_FILTER:
+//     while (!last) {
+//     #pragma HLS PIPELINE II = 1
+//     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+        // T_IN in = istrm.read();
+        // T_OUT out;
+        // bool result = func(in, out);
+
+        // if (result) {
+        //     ostrm.write(out);
+        //     e_ostrm.write(false);
+        // }
+
+//         last = e_istrm.read();
+//     }
+//     e_ostrm.write(true);
+// }
+
+
+// template <typename T_FUNC, typename T_IN, typename T_OUT = T_IN>
+// void Filter(
+//     T_FUNC & func,
+//     fx::stream<T_IN> & istrm,
+//     fx::stream<T_OUT> & ostrm
+// )
+// {
+// #pragma HLS INLINE
+//     Filter(
+//         func,
+//         istrm.data, istrm.e_data,
+//         ostrm.data, ostrm.e_data
+//     );
+// }
 
 
 // template <int N, typename T_FUNC, typename T_IN, typename T_OUT = T_IN, int in_depth, int out_depth>
