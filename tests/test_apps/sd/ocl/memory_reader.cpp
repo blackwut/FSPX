@@ -13,11 +13,13 @@ extern "C" {
     )
     {
         #pragma HLS INTERFACE mode=m_axi port=in bundle=in num_read_outstanding=64 max_read_burst_length=64
+        #pragma HLS INTERFACE mode=axis port=out
 
-        #pragma HLS DATAFLOW
-        stream_t internal_stream;
+        // #pragma HLS DATAFLOW
+        // stream_t internal_stream;
 
-        fx::WMtoS(in, in_count, eos, internal_stream);
-        fx::StoA(internal_stream, out);
+        // fx::WMtoS(in, in_count, (eos != 0), internal_stream);
+        // fx::StoA(internal_stream, out);
+        fx::WMtoAS(in, in_count, (eos != 0), out);
     }
 }

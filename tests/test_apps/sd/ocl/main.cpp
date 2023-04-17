@@ -218,28 +218,109 @@ double event_time_us(cl::Event e)
     return (end - start) / 1000.0;
 }
 
-template <typename T>
-void fill_batch(Batch_t<T> & batch)
+static record_t new_record(int i)
 {
-    unsigned int i = 0;
-    for (T & t : batch) {
-        t.key = (unsigned int)(i % record_t::MAX_KEY_VALUE);
-        t.value = i;
-        ++i;
+    record_t r;
+    r.key = static_cast<unsigned int>(i % record_t::MAX_KEY_VALUE);
+    r.property_value = static_cast<float>(i);
+    r.incremental_average = 0;
+    r.timestamp = 0;
+    return r;
+}
+
+static void print_record(const record_t & r)
+{
+    std::cout << "("
+    << r.key << ", "
+    << r.property_value << ", "
+    << r.incremental_average << ", "
+    << r.timestamp
+    << ")"
+    << std::endl;
+}
+
+void fill_batch(Batch_t<record_t> & batch)
+{
+    // unsigned int i = 0;
+    // for (record_t & t : batch) {
+    //     t.key = i;
+    //     t.property_value = i;
+    //     t.timestamp = i + 1;
+    //     ++i;
+    // }
+    for (int i = 0; i < batch.size(); ++i) {
+        batch[i] = new_record(i);
     }
 }
 
-template <>
-void fill_batch(Batch_t<record_t> & batch)
-{
-    unsigned int i = 0;
-    for (record_t & t : batch) {
-        t.key = i;
-        t.property_value = i;
-        t.timestamp = i + 1;
-        ++i;
-    }
-}
+// void source_thread(
+//     XilinxContext & xcontext,
+//     std::vector<record_t> & dataset,
+//     size_t n,
+//     size_t batch_size,
+//     size_t max_keys,
+//     size_t iterations
+// )
+// {
+//     cl_int err;
+//     cl::Kernel k = xcontext.createKernel("memory_reader");
+
+//     auto timestart_fill = get_time();
+//     CLBuffers<record_t> batches(xcontext, n, batch_size, CL_MEM_READ_ONLY);
+//     for (int i = 0; i < n; ++i) {
+//         fill_batch(batches.getHostBuffer(i));
+//     }
+//     auto timeend_fill = get_time();
+//     print_time<record_t>("fill", n * batch_size, timestart_fill, timeend_fill);
+
+
+//     // size_t t_index = 0;
+//     // for (int i = 0; i < n; ++i) {
+//     //     auto buff = batches.getHostBuffer(i);
+//     //     for (int j = 0; j < batch_size; ++j) {
+//     //         buff[j] = dataset[t_index];
+//     //         t_index = (t_index + 1) % dataset.size();
+//     //         buff[j].print();
+//     //     }
+//     // }
+
+//     std::cout << "Waiting for barrier..." << std::endl;
+//     pthread_barrier_wait(&barrier);
+
+//     auto timestart_source = get_time();
+//     std::vector<cl::Event> kernel_event(iterations);
+//     for (int i = 0; i < iterations; ++i) {
+//         std::vector<cl::Event> events;
+//         if (i >= n) {
+//             events.push_back(kernel_event[i - n]);
+//         }
+
+//         std::vector<cl::Event> wait_events;
+//         wait_events.push_back(batches.migrateToDevice((events.size() > 0 ? &events : nullptr)));
+
+//         int in_size = int(batches.currentHostBuffer().size() / (512 / (sizeof(record_t) * 8)));
+//         int eos_int = (i == (iterations - 1) ? 1 : 0);
+//         std::cout << "(source) in_size: " << in_size << std::endl;
+//         std::cout << "(source) eos_int: " << eos_int << std::endl;
+
+//         cl_int argi = 0;
+//         OCL_CHECK(err, err = k.setArg(argi++, batches.currentDeviceBuffer()));
+//         OCL_CHECK(err, err = k.setArg(argi++, in_size));
+//         OCL_CHECK(err, err = k.setArg(argi++, eos_int));
+//         OCL_CHECK(err, err = xcontext.queue.enqueueTask(k, &wait_events, &kernel_event[i]));
+
+//         // 0 line_t * in,
+//         // 1 int in_count,
+//         // 2 int eos,
+//         // 3 axis_stream_t & out
+
+//         batches.next();
+//     }
+
+//     kernel_event[iterations - 1].wait();
+//     auto timeend_source = get_time();
+//     print_time<record_t>("source", iterations * batch_size, timestart_source, timeend_source);
+// }
 
 void source_thread(
     XilinxContext & xcontext,
@@ -258,6 +339,9 @@ void source_thread(
     for (int i = 0; i < n; ++i) {
         fill_batch(batches.getHostBuffer(i));
     }
+    auto timeend_fill = get_time();
+    print_time<record_t>("fill", n * batch_size, timestart_fill, timeend_fill);
+
 
     // size_t t_index = 0;
     // for (int i = 0; i < n; ++i) {
@@ -272,38 +356,29 @@ void source_thread(
     std::cout << "Waiting for barrier..." << std::endl;
     pthread_barrier_wait(&barrier);
 
-    auto timeend_fill = get_time();
-    print_time<record_t>("fill", n * batch_size, timestart_fill, timeend_fill);
-
     auto timestart_source = get_time();
     std::vector<cl::Event> kernel_event(iterations);
     for (int i = 0; i < iterations; ++i) {
-        std::vector<cl::Event> events;
-        if (i >= n) {
-            events.push_back(kernel_event[i - n]);
-        }
 
         std::vector<cl::Event> wait_events;
-        wait_events.push_back(batches.migrateToDevice(&events));
+        wait_events.push_back(batches.migrateToDevice());
 
-        cl_int in_size = int(batches.currentHostBuffer().size() / (512 / (sizeof(record_t) * 8)));
+        int in_size = int(batches.currentHostBuffer().size() / (512 / (sizeof(record_t) * 8)));
+        int eos_int = (i == (iterations - 1) ? 1 : 0);
         std::cout << "(source) in_size: " << in_size << std::endl;
+        std::cout << "(source) eos_int: " << eos_int << std::endl;
 
         cl_int argi = 0;
         OCL_CHECK(err, err = k.setArg(argi++, batches.currentDeviceBuffer()));
         OCL_CHECK(err, err = k.setArg(argi++, in_size));
-        OCL_CHECK(err, err = k.setArg(argi++, int(i == (iterations - 1))));
+        OCL_CHECK(err, err = k.setArg(argi++, eos_int));
         OCL_CHECK(err, err = xcontext.queue.enqueueTask(k, &wait_events, &kernel_event[i]));
 
-        // 0 line_t * in,
-        // 1 int in_count,
-        // 2 int eos,
-        // 3 axis_stream_t & out
+        kernel_event[i].wait();
 
         batches.next();
     }
 
-    kernel_event[iterations - 1].wait();
     auto timeend_source = get_time();
     print_time<record_t>("source", iterations * batch_size, timestart_source, timeend_source);
 }
@@ -319,10 +394,6 @@ void sink_thread(
     CLBuffers<record_t> batches(xcontext, 1, batch_size, CL_MEM_WRITE_ONLY);
     CLBuffers<int> written_counts(xcontext, 1, 1, CL_MEM_WRITE_ONLY);
     CLBuffers<int> eos(xcontext, 1, 1, CL_MEM_WRITE_ONLY);
-
-    // mw_contexts.currentHostBuffer()[0].elements = 0;
-    // mw_contexts.currentHostBuffer()[0].eos = false;
-    // mw_contexts.migrateToDevice(nullptr, true);
 
     std::cout << "Waiting for barrier..." << std::endl;
     pthread_barrier_wait(&barrier);
@@ -347,26 +418,24 @@ void sink_thread(
     // 2 int out_count,
     // 3 int * written_count,
     // 4 int * eos
-
-
+        std::cout << "(sink) enqueueTask()" << std::endl;
         OCL_CHECK(err, err = xcontext.queue.enqueueTask(k, nullptr, &kernel_event[0]));
 
         batches.migrateToHost(&kernel_event, true);
         written_counts.migrateToHost(&kernel_event, true);
         eos.migrateToHost(&kernel_event, true);
 
-        std::cout << "sink Elements: " << COUT_INTEGER << written_counts.currentHostBuffer()[0] << std::endl;
-        std::cout << "     sink EOS: " << COUT_BOOLEAN << eos.currentHostBuffer()[0] << std::endl;
+        int written_count = written_counts.currentHostBuffer()[0];
+        int eos_bool = (eos.currentHostBuffer()[0] != 0);
 
-        // size_t elems = written_counts.currentHostBuffer()[0];
-        // for (int i = 0; i < batch_size; ++i) {
-        //     // batches.currentHostBuffer()[i].print();
-        //     // std::cout << batches.currentHostBuffer()[i].key << ", " << batches.currentHostBuffer()[i].value << std::endl;
-        // }
+        std::cout << "sink Elements: " << COUT_INTEGER << written_count << std::endl;
+        std::cout << "     sink EOS: " << COUT_BOOLEAN << eos_bool << std::endl;
 
-        // batches.next();
-        // mw_contexts.next();
-        done = eos.currentHostBuffer()[0];
+        for (int i = 0; i < batch_size; ++i) {
+            print_record(batches.currentHostBuffer()[i]);
+        }
+
+        done = eos_bool;
         it++;
         n_sink++;
     }

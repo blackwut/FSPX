@@ -4,6 +4,7 @@
 // #include "fspx.hpp"
 #include "tuple.hpp"
 
+constexpr int K = 2;                                // number of kernel calls
 constexpr int SIZE = 512;                           // input size
 constexpr int WIDTH = 512;                          // width of bus
 constexpr int ITEM_BITS = sizeof(record_t) * 8;     // number of bits of an item

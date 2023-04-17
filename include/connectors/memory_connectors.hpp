@@ -77,6 +77,40 @@ WMtoS:
     }
 }
 
+template <typename T, int W, int DEPTH_OUT>
+void WMtoAS(
+    ap_uint<W> * in,
+    int count,
+    bool eos,
+    fx::axis_stream<T, DEPTH_OUT> & out
+)
+{
+    HW_STATIC_ASSERT(W % sizeof(T) == 0,
+                     "AXI port width W is not multiple of stream element width (sizeof(T) * 8).");
+    HW_STATIC_ASSERT((W >= 8) && (W <= 512) && IS_POW2(W),
+                     "AXI port width W must be power of 2 and between 8 to 512.");
+
+    constexpr int T_BITS = sizeof(T) * 8;   // item size in bits
+    constexpr int READ_ITEMS = W / T_BITS;  // number of items in a read operation
+
+WMtoAS:
+    for (int i = 0; i < count; ++i) {
+    #pragma HLS PIPELINE II = READ_ITEMS
+    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+
+        bool last_i = (i + 1) == count;
+
+        ap_uint<W> line = in[i];
+        for (int j = 0; j < READ_ITEMS; ++j) {
+            bool last_j = (j + 1) == READ_ITEMS;
+        #pragma HLS PIPELINE II = 1
+        #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+            ap_uint<T_BITS> item = line.range(T_BITS * (j + 1) - 1, T_BITS * j);
+            out.write(TypeHandler<T>::from_ap(item), (eos && last_i && last_j));
+        }
+    }
+}
+
 template <typename T, int W, int DEPTH_OUT, int N_OUTS = W / (sizeof(T) * 8)>
 void WMtoSN_RR(
     ap_uint<W> * in,
