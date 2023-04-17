@@ -32,13 +32,13 @@ struct axis_stream
         return w.data;
     }
 
-    void write(const T & v)
+    void write(const T & v, bool last = false)
     {
     #pragma HLS INLINE
         wrapper_t w;
         w.data = v;
         w.keep = -1;
-        w.last = false;
+        w.last = last;
         data.write(w);
     }
 

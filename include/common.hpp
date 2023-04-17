@@ -11,6 +11,15 @@
 #define DUMP_MSG_VAR(msg, x) { std::cout << msg << ": " << x << std::endl; }
 
 
+// #ifndef __SYNTHESIS__
+// #include <iostream>
+// #define DUMP_VAR(x)             { std::cout << #x  << ": " << x << std::endl; }
+// #define DUMP_MSG_VAR(msg, x)    { std::cout << msg << ": " << x << std::endl; }
+// #else
+// #define DUMP_VAR(x)          ((void)0)
+// #define DUMP_MSG_VAR(msg, x) ((void)0)
+// #endif
+
 #ifndef __SYNTHESIS__
 #include <cassert>
 #define HW_ASSERT(b) assert((b))
