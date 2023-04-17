@@ -10,11 +10,8 @@ void test(
     int * eos
 )
 {
-    #pragma HLS INTERFACE mode=m_axi port=out depth=SIZE num_write_outstanding=64 max_write_burst_length=64
+    #pragma HLS INTERFACE mode=m_axi port=out bundle=out depth=SIZE/K num_write_outstanding=64 max_write_burst_length=64
 
-    #pragma HLS DATAFLOW
-    stream_t internal_stream;
-
-    fx::AtoS(in, internal_stream);
-    fx::StoWM(internal_stream, out, out_size, write_count, eos);
+	#pragma HLS DATAFLOW
+    fx::AStoWM(in, out, out_size, write_count, eos);
 }
