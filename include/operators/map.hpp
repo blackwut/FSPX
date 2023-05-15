@@ -8,14 +8,20 @@
 
 namespace fx {
 
-
-template <typename T_IN, int DEPTH_IN, typename T_OUT, int DEPTH_OUT, typename FUNCTOR_T>
+template <
+    typename STREAM_IN,
+    typename STREAM_OUT,
+    typename FUNCTOR_T
+>
 void Map(
-    fx::stream<T_IN, DEPTH_IN> & istrm,
-    fx::stream<T_OUT, DEPTH_OUT> & ostrm,
+    STREAM_IN & istrm,
+    STREAM_OUT & ostrm,
     FUNCTOR_T && func
 )
 {
+    using T_IN  = typename STREAM_IN::data_t;
+    using T_OUT = typename STREAM_OUT::data_t;
+
     bool last = istrm.read_eos();
 
 Map_StoS:
@@ -32,72 +38,95 @@ Map_StoS:
     ostrm.write_eos();
 }
 
-template <typename T_IN, int DEPTH_IN, typename T_OUT, int DEPTH_OUT, typename FUNCTOR_T>
-void Map(
-    fx::axis_stream<T_IN, DEPTH_IN> & istrm,
-    fx::stream<T_OUT, DEPTH_OUT> & ostrm,
-    FUNCTOR_T && func
-)
-{
-    bool last = false;
-    T_IN in = istrm.read(last);
+// template <typename T_IN, int DEPTH_IN, typename T_OUT, int DEPTH_OUT, typename FUNCTOR_T>
+// void Map(
+//     fx::stream<T_IN, DEPTH_IN> & istrm,
+//     fx::stream<T_OUT, DEPTH_OUT> & ostrm,
+//     FUNCTOR_T && func
+// )
+// {
+//     bool last = istrm.read_eos();
 
-Map_AtoS:
-    while (!last) {
-    #pragma HLS PIPELINE II = 1
-    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-        T_OUT out = func(in);
-        ostrm.write(out);
+// Map_StoS:
+//     while (!last) {
+//     #pragma HLS PIPELINE II = 1
+//     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+//         T_IN in = istrm.read();
+//         last = istrm.read_eos();
 
-        in = istrm.read(last);
-    }
-    ostrm.write_eos();
-}
+//         T_OUT out = func(in);
 
-template <typename T_IN, int DEPTH_IN, typename T_OUT, int DEPTH_OUT, typename FUNCTOR_T>
-void Map(
-    fx::stream<T_IN, DEPTH_IN> & istrm,
-    fx::axis_stream<T_OUT, DEPTH_OUT> & ostrm,
-    FUNCTOR_T && func
-)
-{
-    bool last = istrm.read_eos();
+//         ostrm.write(out);
+//     }
+//     ostrm.write_eos();
+// }
 
-Map_StoA:
-    while (!last) {
-    #pragma HLS PIPELINE II = 1
-    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-        T_IN in = istrm.read();
-        last = istrm.read_eos();
+// template <typename T_IN, int DEPTH_IN, typename T_OUT, int DEPTH_OUT, typename FUNCTOR_T>
+// void Map(
+//     fx::axis_stream<T_IN, DEPTH_IN> & istrm,
+//     fx::stream<T_OUT, DEPTH_OUT> & ostrm,
+//     FUNCTOR_T && func
+// )
+// {
+//     bool last = false;
+//     T_IN in = istrm.read(last);
 
-        T_OUT out = func(in);
+// Map_AtoS:
+//     while (!last) {
+//     #pragma HLS PIPELINE II = 1
+//     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+//         T_OUT out = func(in);
+//         ostrm.write(out);
 
-        ostrm.write(out);
-    }
-    ostrm.write_eos();
-}
+//         in = istrm.read(last);
+//     }
+//     ostrm.write_eos();
+// }
 
-template <typename T_IN, int DEPTH_IN, typename T_OUT, int DEPTH_OUT, typename FUNCTOR_T>
-void Map(
-    fx::axis_stream<T_IN, DEPTH_IN> & istrm,
-    fx::axis_stream<T_OUT, DEPTH_OUT> & ostrm,
-    FUNCTOR_T && func
-)
-{
-    bool last = false;
-    T_IN in = istrm.read(last);
+// template <typename T_IN, int DEPTH_IN, typename T_OUT, int DEPTH_OUT, typename FUNCTOR_T>
+// void Map(
+//     fx::stream<T_IN, DEPTH_IN> & istrm,
+//     fx::axis_stream<T_OUT, DEPTH_OUT> & ostrm,
+//     FUNCTOR_T && func
+// )
+// {
+//     bool last = istrm.read_eos();
 
-Map_AtoA:
-    while (!last) {
-    #pragma HLS PIPELINE II = 1
-    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-        T_OUT out = func(in);
-        ostrm.write(out);
+// Map_StoA:
+//     while (!last) {
+//     #pragma HLS PIPELINE II = 1
+//     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+//         T_IN in = istrm.read();
+//         last = istrm.read_eos();
 
-        in = istrm.read(last);
-    }
-    ostrm.write_eos();
-}
+//         T_OUT out = func(in);
+
+//         ostrm.write(out);
+//     }
+//     ostrm.write_eos();
+// }
+
+// template <typename T_IN, int DEPTH_IN, typename T_OUT, int DEPTH_OUT, typename FUNCTOR_T>
+// void Map(
+//     fx::axis_stream<T_IN, DEPTH_IN> & istrm,
+//     fx::axis_stream<T_OUT, DEPTH_OUT> & ostrm,
+//     FUNCTOR_T && func
+// )
+// {
+//     bool last = false;
+//     T_IN in = istrm.read(last);
+
+// Map_AtoA:
+//     while (!last) {
+//     #pragma HLS PIPELINE II = 1
+//     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+//         T_OUT out = func(in);
+//         ostrm.write(out);
+
+//         in = istrm.read(last);
+//     }
+//     ostrm.write_eos();
+// }
 
 
 // template <typename FUNCTOR_T, typename T_IN, typename T_OUT = T_IN>

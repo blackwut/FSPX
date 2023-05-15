@@ -17,6 +17,8 @@ namespace fx {
 template <typename T, int DEPTH = 0>
 struct stream
 {
+    using data_t = T;
+
     hls::stream<T> data;
     hls::stream<bool> e_data;
 

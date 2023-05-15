@@ -23,24 +23,49 @@
 
 namespace fx {
 
-template <typename T, int DEPTH_IN, int DEPTH_OUT>
-void AtoA(
-    fx::axis_stream<T, DEPTH_IN> & istrm,
-    fx::axis_stream<T, DEPTH_OUT> & ostrm
+template <
+    typename STREAM_IN,
+    typename STREAM_OUT
+>
+void S2S(
+    STREAM_IN & istrm,
+    STREAM_OUT & ostrm
 )
 {
-    bool last = false;
-    T t = istrm.read(last);
+    using T = typename STREAM_IN::data_t;
+    bool last = istrm.read_eos();
 
-AtoA:
+S2S:
     while (!last) {
     #pragma HLS PIPELINE II = 1
     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+        T t = istrm.read();
+        last = istrm.read_eos();
+
         ostrm.write(t);
-        t = istrm.read(last);
     }
     ostrm.write_eos();
 }
+
+// template <typename T, int DEPTH_IN = 0, int DEPTH_OUT = 0>
+// void S2S(
+//     fx::axis_stream<T, DEPTH_IN> & istrm,
+//     fx::axis_stream<T, DEPTH_OUT> & ostrm
+// )
+// {
+//     bool last = istrm.read_eos();
+
+// AtoA:
+//     while (!last) {
+//     #pragma HLS PIPELINE II = 1
+//     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+//         T t = istrm.read();
+//         last = istrm.read_eos();
+
+//         ostrm.write(t);
+//     }
+//     ostrm.write_eos();
+// }
 
 template <typename T, int DEPTH_IN, int DEPTH_OUT>
 void StoA(
