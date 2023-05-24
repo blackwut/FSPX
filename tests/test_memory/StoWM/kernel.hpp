@@ -33,7 +33,7 @@ constexpr int READ_ITEMS = WIDTH / ITEM_BITS;   // number of items in a read ope
 
 
 using line_t = ap_uint<WIDTH>;                  // read/write datatype
-using stream_t = fx::stream<line_t, 2>;
+using stream_t = fx::stream<data_t, 2>;
 
 
 void test(
