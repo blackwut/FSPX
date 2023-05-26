@@ -179,7 +179,7 @@ public:
         #pragma HLS INLINE
     }
 
-    DataPackProxy(DataPackProxy<T, N> const &) = default; 
+    DataPackProxy(DataPackProxy<T, N> const &) = default;
 
     DataPackProxy(DataPackProxy<T, N> &&) = default;
 
@@ -216,6 +216,11 @@ public:
     // }
 
     operator T() const {
+    #pragma HLS INLINE
+        return data_.get(index_);
+    }
+
+    operator item_t() const {
     #pragma HLS INLINE
         return data_.get(index_);
     }
