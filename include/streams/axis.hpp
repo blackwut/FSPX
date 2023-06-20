@@ -1,5 +1,5 @@
-#ifndef __AXIS_STREAM_HPP__
-#define __AXIS_STREAM_HPP__
+#ifndef __STREAMS_AXIS_HPP__
+#define __STREAMS_AXIS_HPP__
 
 #include "ap_int.h"
 #include "ap_axi_sdata.h"
@@ -73,13 +73,25 @@ struct axis_stream
         return data.empty();
     }
 
+    bool empty_eos()
+    {
+    #pragma HLS INLINE
+        return e_data.empty();
+    }
+
     bool full()
     {
     #pragma HLS INLINE
         return data.full();
     }
+
+    bool full_eos()
+    {
+    #pragma HLS INLINE
+        return e_data.full();
+    }
 };
 
 }
 
-#endif // __AXIS_STREAM_HPP__
+#endif // __STREAMS_AXIS_HPP__

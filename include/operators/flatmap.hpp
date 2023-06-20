@@ -8,7 +8,6 @@
 
 namespace fx {
 
-
 template <typename STREAM_OUT>
 struct FlatMapShipper
 {
@@ -39,24 +38,26 @@ struct FlatMapShipper
 
 
 template <
+    typename FUNCTOR_T,
     typename STREAM_IN,
-    typename STREAM_OUT,
-    typename FUNCTOR_T
+    typename STREAM_OUT
+    typename... Args
 >
 void FlatMap(
     STREAM_IN & istrm,
     STREAM_OUT & ostrm,
-    FUNCTOR_T && func
+    Args&&... args
 )
 {
     using T_IN  = typename STREAM_IN::data_t;
     using T_OUT = typename STREAM_OUT::data_t;
 
+    static FUNCTOR_T func(std::forward<Args>(args)...);
     static FlatMapShipper<T_OUT> shipper(ostrm);
 
     bool last = istrm.read_eos();
 
-FlatMap_StoS:
+FlatMap:
     while (!last) {
     #pragma HLS PIPELINE II = 1
     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024

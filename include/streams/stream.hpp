@@ -1,5 +1,5 @@
-#ifndef __STREAM_HPP__
-#define __STREAM_HPP__
+#ifndef __STREAMS_STREAM_HPP__
+#define __STREAMS_STREAM_HPP__
 
 #include "hls_stream.h"
 #include "../common.hpp"
@@ -64,13 +64,25 @@ struct stream
         return data.empty();
     }
 
+    bool empty_eos()
+    {
+    #pragma HLS INLINE
+        return e_data.empty();
+    }
+
     bool full()
     {
     #pragma HLS INLINE
         return data.full();
     }
+
+    bool full_eos()
+    {
+    #pragma HLS INLINE
+        return e_data.full();
+    }
 };
 
 }
 
-#endif // __STREAM_HPP__
+#endif // __STREAMS_STREAM_HPP__
