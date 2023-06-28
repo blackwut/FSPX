@@ -37,7 +37,6 @@
 .Xil/
 .theia
 _x/
-main*
 *.xclbin
 *.xclbin.*
 *.xo
@@ -56,6 +55,7 @@ native_trace.csv
 opencl_trace.csv
 summary.csv
 *.run_summary
+.lock
 
 
 # vitis_hls
