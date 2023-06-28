@@ -13,4 +13,10 @@ constexpr int READ_WRITE_ITEMS = WIDTH / ITEM_BITS; // number of items in a read
 using line_t = ap_uint<WIDTH>;                      // read/write datatype
 using axis_stream_t = fx::axis_stream<record_t, 2>;
 
+
+constexpr int SO_PAR = 1;
+constexpr int MA_PAR = 2;
+constexpr int SD_PAR = 2;
+constexpr int SI_PAR = 1;
+
 #endif // __CONSTANTS_HPP__

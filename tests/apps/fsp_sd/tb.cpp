@@ -2,16 +2,21 @@
 
 int main() {
 
-    axis_stream_t in[2];
-    axis_stream_t out("out");
+    stream_t stream;
+
+    axis_stream_t in[SO_PAR];
+    axis_stream_t out[SI_PAR];
 
     for (int i = 0; i < SIZE; ++i) {
-        record_t r = new_record(i);
-        in[0].write(r);
-        in[1].write(r);
+        record_t r = new_record_spike(i);
+        for (int j = 0; j < SO_PAR; ++j){
+            in[j].write(r);
+        }   
     }
-    in[0].write_eos();
-    in[1].write_eos();
+
+    for (int i = 0; i < SO_PAR; ++i) {
+        in[i].write_eos();
+    }
 
     test(in, out);
 
@@ -37,10 +42,13 @@ int main() {
     //     ++i;
     // }
 
-    bool last = out.read_eos();
-    while (!last) {
-        record_t r = out.read(last);
-        print_record(r);
+    for (int i = 0; i < SI_PAR; ++i) {
+        bool last = out[i].read_eos();
+        while (!last) {
+            record_t r = out[i].read();
+            last = out[i].read_eos();
+            print_record(r);
+        }
     }
 
     return 0;

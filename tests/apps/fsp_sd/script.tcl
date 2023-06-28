@@ -32,7 +32,7 @@ config_export -format ip_catalog -rtl verilog -vivado_clock 3
 
 csim_design -clean
 csynth_design
-cosim_design -enable_dataflow_profiling
+#cosim_design -enable_dataflow_profiling
 # export_design -flow syn -rtl verilog -format ip_catalog
 
 exit
