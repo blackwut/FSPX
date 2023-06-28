@@ -4,5 +4,7 @@
 #include "map.hpp"
 #include "filter.hpp"
 // #include "flatmap.hpp"
+#include "generator.hpp"
+#include "drainer.hpp"
 
 #endif // __OPERATORS_HPP__
