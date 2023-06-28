@@ -607,6 +607,7 @@ template <
 void SNMtoS_KB(
     STREAM_IN istrms[N][M],
     STREAM_OUT & ostrm,
+    int m,
     KEY_GENERATOR_T && key_generator,
     const char * name = ""
 )
@@ -621,7 +622,7 @@ void SNMtoS_KB(
 SNMtoS_KB_INIT:
     for (int i = 0; i < N; ++i) {
     #pragma HLS UNROLL
-        lasts[i] = istrms[i].read_eos();
+        lasts[i] = istrms[i][m].read_eos();
     }
 
 SNMtoS_KB:
@@ -633,8 +634,8 @@ SNMtoS_KB:
         index++;
 
         if (!lasts[id]) {
-            T t = istrms[id].read();
-            lasts[id] = istrms[id].read_eos();
+            T t = istrms[id][m].read();
+            lasts[id] = istrms[id][m].read_eos();
 
             #if defined(__DEBUG__CONNECTORS__)
             std::stringstream ss;
