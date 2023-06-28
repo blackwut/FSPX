@@ -1,12 +1,12 @@
-#include "ap_int.h"
-#include "ap_axi_sdata.h"
-#include "hls_stream.h"
+#include "../../../include/fspx.hpp"
 
-#include "../../include/fspx.hpp"
+#define PAR      4
+#define SIZE    16
 
+using data_t = int;
+using stream_t = fx::stream<data_t, 2>;
 
 void test(
-    fx::stream<int> & in,
-    fx::stream<int> & out,
-	int size
+    stream_t & in,
+    stream_t & out
 );

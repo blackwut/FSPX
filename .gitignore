@@ -35,8 +35,8 @@
 .ipcache/
 .run/
 .Xil/
+.theia
 _x/
-main
 *.xclbin
 *.xclbin.*
 *.xo
@@ -46,6 +46,17 @@ main
 *.wcfg
 *.wdb
 emconfig.json
+*.jou
+*.ltx
+.repo.yaml
+device_trace_*.csv
+hal_host_trace.csv
+native_trace.csv
+opencl_trace.csv
+summary.csv
+*.run_summary
+.lock
+
 
 # vitis_hls
 Debug/
