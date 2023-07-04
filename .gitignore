@@ -38,6 +38,8 @@ solution/
 .project
 .vitis_hls_log_all.xml
 kernel.xml
+hls.app
+
 # .autopilot/
 # build/
 # csim/
