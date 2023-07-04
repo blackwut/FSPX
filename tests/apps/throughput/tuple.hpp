@@ -11,7 +11,7 @@ struct record_t
     record_t() = default;
 
     #ifndef __SYNTHESIS__
-    record_t(unsigned int key, float val, float incremental_average, unsigned int timestamp)
+    record_t(unsigned int key, float val)
     : key(key)
     , val(val)
     {

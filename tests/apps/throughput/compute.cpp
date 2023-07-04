@@ -3,9 +3,9 @@
 #include "constants.hpp"
 #include "tuple.hpp"
 
-#define SO_PAR 2
-#define IN_PAR 2
-#define SI_PAR 2
+#define SO_PAR 4
+#define IN_PAR 4
+#define SI_PAR 4
 
 
 template <

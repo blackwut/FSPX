@@ -1,60 +1,64 @@
-#include "fx_opencl.hpp"
-
-#include <algorithm>
-#include <cstdio>
-#include <random>
+#include <iostream>
 #include <vector>
-#include <array>
-#include <deque>
+#include <atomic>
+#include <chrono>
+#include <cstring>
 #include <thread>
-#include <string>
 #include <pthread.h>
-#include <cassert>
-#include <string.h> // memcpy
+#include <mutex>
 
+
+#include "fspx_host.hpp"
 #include "tuple.hpp"
 
-size_t _n_sink = 0;
 
+#define DEBUG_MR_PRINT_FILL_BW         0
+#define DEBUG_MW_PRINT_TUPLES          0
+#define DEBUG_MW_NUM_TUPLES_TO_PRINT   4
+
+std::mutex mutex_print;
 pthread_barrier_t barrier;
+std::atomic<size_t> tuples_sent;
+std::atomic<size_t> tuples_received;
+std::atomic<size_t> batches_sent;
+std::atomic<size_t> batches_received;
+
+
+auto get_time() { return std::chrono::high_resolution_clock::now(); }
 
 template <typename T>
 void print_time(
     std::string name,
-    size_t number_of_tuples,
-    std::chrono::high_resolution_clock::time_point start,
-    std::chrono::high_resolution_clock::time_point end,
-    bool is_bandwidth = true)
+    size_t num_tuples,
+    double time_diff_ns,
+    std::string color = fx::COLOR_WHITE
+)
 {
-    auto timeDiff = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    std::lock_guard<std::mutex> lock(mutex_print);
 
-    if (is_bandwidth) {
-        double thr = number_of_tuples * sizeof(T);
-        thr *= 1000000;     // convert us to s
-        thr /= 1024 * 1024; // convert to MB
-        thr /= timeDiff;
+    size_t throughput_tps = (num_tuples / time_diff_ns) * 1e9;
+    size_t throughput_bs = (num_tuples * sizeof(T) / time_diff_ns) * 1e9;
 
-        std::cout
-            << COUT_HEADER << name
-            << COUT_HEADER << "\tTime: "       << COUT_FLOAT << timeDiff / 1000 << " ms"
-            << COUT_HEADER << "\tThroughput: " << COUT_FLOAT << thr             << " MB/s"
-            << std::endl;
-    } else {
-        double thr = number_of_tuples;
-        thr /= timeDiff;
-        thr *= 1000000;   // convert us to s
-        size_t tuple_sec = thr / 1000; // convert to Kilo tuples/sec
-        std::cout
-            << COUT_HEADER << name
-            << COUT_HEADER << "\tTime: "       << COUT_FLOAT   << timeDiff / 1000  << " ms"
-            << COUT_HEADER << "\tKTuple/sec: " << COUT_INTEGER << tuple_sec
-            << std::endl;
-    }
+    std::cout
+        << COUT_HEADER_SMALL << name << ": "
+        << COUT_HEADER_SMALL << "\tTime: "       << COUT_FLOAT_(2) << time_diff_ns / 1e6 << " ms"
+        << COUT_HEADER_SMALL << "\tThroughput: "
+        << fx::colorString(fx::formatTuplesPerSecond(throughput_tps), color)
+        << fx::colorString(fx::formatBytesPerSecond(throughput_bs), color)
+        << '\n';
 }
 
-auto get_time()
+template <typename T>
+void print_time(
+    std::string name,
+    size_t num_tuples,
+    std::chrono::high_resolution_clock::time_point start,
+    std::chrono::high_resolution_clock::time_point end,
+    std::string color = fx::COLOR_WHITE
+)
 {
-    return std::chrono::high_resolution_clock::now();
+    auto time_diff = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    print_time<T>(name, num_tuples, time_diff, color);
 }
 
 
@@ -64,10 +68,13 @@ void print_record(const record_t & r)
     << r.key << ", "
     << r.val << ", "
     << ")"
-    << std::endl;
+    << '\n';
 }
 
-void print_batch(record_t * batch, size_t size)
+void print_batch(
+    record_t * batch,
+    size_t size
+)
 {
     for (size_t i = 0; i < size; ++i) {
         print_record(batch[i]);
@@ -85,7 +92,11 @@ std::vector<record_t> generate_dataset(size_t size)
 }
 
 template <typename T>
-void fill_batch_with_dataset(const std::vector<T> & dataset, T * batch, size_t size)
+void fill_batch_with_dataset(
+    const std::vector<T> & dataset,
+    T * batch,
+    const size_t size
+)
 {
     size_t n = size / dataset.size();
     size_t remaining_elems = size % dataset.size();
@@ -93,7 +104,6 @@ void fill_batch_with_dataset(const std::vector<T> & dataset, T * batch, size_t s
     T * bufferStart = batch;
     for (size_t i = 0; i < n; i++) {
         memcpy(bufferStart, dataset.data(), dataset.size() * sizeof(T));
-
         bufferStart += dataset.size();
     }
 
@@ -102,613 +112,94 @@ void fill_batch_with_dataset(const std::vector<T> & dataset, T * batch, size_t s
     }
 }
 
-namespace fx {
-
-#define MAX_HBM_PC_COUNT 32
-#define PC_NAME(n) (n | XCL_MEM_TOPOLOGY)
-const int pc_[MAX_HBM_PC_COUNT] = {
-    PC_NAME(0),  PC_NAME(1),  PC_NAME(2),  PC_NAME(3),  PC_NAME(4),  PC_NAME(5),  PC_NAME(6),  PC_NAME(7),
-    PC_NAME(8),  PC_NAME(9),  PC_NAME(10), PC_NAME(11), PC_NAME(12), PC_NAME(13), PC_NAME(14), PC_NAME(15),
-    PC_NAME(16), PC_NAME(17), PC_NAME(18), PC_NAME(19), PC_NAME(20), PC_NAME(21), PC_NAME(22), PC_NAME(23),
-    PC_NAME(24), PC_NAME(25), PC_NAME(26), PC_NAME(27), PC_NAME(28), PC_NAME(29), PC_NAME(30), PC_NAME(31)};
-
-
-template <typename T>
-struct Source_Execution
-{
-    OCL & ocl;
-
-    size_t batch_size;
-
-    cl_mem batch_d;
-    T * batch_h;
-
-    cl_command_queue queue;
-    cl_kernel kernel;
-    cl_event migrate_event;
-    cl_event kernel_event;
-
-    int i;
-
-    Source_Execution(
-        OCL & ocl,
-        cl_command_queue q,
-        const size_t batch_size,
-        int i = -1)
-    : ocl(ocl)
-    // , queue(queue)
-    , batch_size(batch_size)
-    , batch_d(nullptr)
-    , batch_h(nullptr)
-    , i(i)
-    {
-        cl_int err;
-
-        queue = ocl.createCommandQueue(true);
-        kernel = ocl.createKernel("memory_reader");
-
-        batch_h = aligned_alloc<T>(batch_size);
-
-        cl_mem_ext_ptr_t batch_ext;
-        batch_ext.obj = batch_h;
-        batch_ext.param = 0;
-        batch_ext.flags = pc_[0];
-
-        batch_d = clCreateBuffer(
-            ocl.context,
-            CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY | CL_MEM_EXT_PTR_XILINX,
-            batch_size * sizeof(T), &batch_ext,
-            &err
-        );
-        clCheckErrorMsg(err, "Failed to create batch_d");
-    }
-
-    void execute(bool eos)
-    {
-        // std::cout << "Executing SourceExecution: " << i << std::endl;
-        const cl_int count_int = static_cast<cl_int>(batch_size / ((512 / 8) / sizeof(T)));
-        const cl_int eos_int = static_cast<cl_int>(eos);
-
-        cl_uint argi = 0;
-        clCheckError(clSetKernelArg(kernel, argi++, sizeof(batch_d),   &batch_d));
-        clCheckError(clSetKernelArg(kernel, argi++, sizeof(count_int), &count_int));
-        clCheckError(clSetKernelArg(kernel, argi++, sizeof(eos_int),   &eos_int));
-
-        clCheckError(clEnqueueMigrateMemObjects(
-            queue,
-            1, &batch_d, 0,
-            0, nullptr, &migrate_event
-        ));
-        // clFlush(queue);
-
-        clCheckError(clEnqueueTask(queue, kernel, 1, &migrate_event, &kernel_event));
-        // size_t gws[3] = {1, 1, 1};
-        // size_t lws[3] = {1, 1, 1};
-        // clCheckError(clEnqueueNDRangeKernel(queue, kernel, 1, NULL, gws, lws, 1, &migrate_event, &kernel_event));
-
-        // clFlush(queue);
-    }
-
-    T * get_batch()
-    {
-        return batch_h;
-    }
-
-    void wait()
-    {
-        // std::cout << "Waiting SourceExecution: " << i << std::endl;
-        clWaitForEvents(1, &kernel_event);
-        clCheckError(clReleaseEvent(kernel_event));
-        clCheckError(clReleaseEvent(migrate_event));
-    }
-
-    ~Source_Execution()
-    {
-        clReleaseMemObject(batch_d);
-        clReleaseKernel(kernel);
-
-        free(batch_h);
-    }
-};
-
-template <typename T>
-struct Source
-{
-    OCL & ocl;
-
-    size_t max_batch_size;
-    size_t number_of_buffers;
-    size_t iterations;
-
-    cl_command_queue queue;
-    std::deque<Source_Execution<T> *> waiting_executions;
-    std::deque<Source_Execution<T> *> running_executions;
-
-    Source(
-        OCL & ocl,
-        const size_t batch_size,
-        const size_t N)
-    : ocl(ocl)
-    , max_batch_size(next_pow2(batch_size))
-    , number_of_buffers(N)
-    , iterations(0)
-    , waiting_executions()
-    , running_executions()
-    {
-        if (batch_size != max_batch_size) {
-            std::cout << "fx::Source: `batch_size` is rounded to the next power of 2 ("
-                      << batch_size << " -> " << max_batch_size << ")" << std::endl;
-        }
-
-        queue = ocl.createCommandQueue();
-
-        for (size_t n = 0; n < number_of_buffers; ++n) {
-            running_executions.push_back(new Source_Execution<T>(ocl, queue, max_batch_size, n));
-        }
-    }
-
-    T * get_batch()
-    {
-        Source_Execution<T> * execution = running_executions.front();
-        running_executions.pop_front();
-
-        if (iterations >= number_of_buffers) {
-            execution->wait();
-        }
-
-        T * batch = execution->get_batch();
-        waiting_executions.push_back(execution);
-
-        return batch;
-    }
-
-    void push(
-        T * batch,
-        const size_t batch_elems,
-        const bool last = false)
-    {
-        Source_Execution<T> * execution = waiting_executions.front();
-        waiting_executions.pop_front();
-        execution->execute(last);
-        running_executions.push_back(execution);
-
-        iterations++;
-    }
-
-    void launch_kernels() {}
-
-    void finish()
-    {
-        while (!running_executions.empty()) {
-            Source_Execution<T> * execution = running_executions.front();
-            running_executions.pop_front();
-            execution->wait();
-            waiting_executions.push_back(execution);
-        }
-
-        clFinish(queue);
-    }
-
-    ~Source()
-    {
-        finish();
-
-        while (!waiting_executions.empty()) {
-            Source_Execution<T> * execution = waiting_executions.front();
-            waiting_executions.pop_front();
-            delete execution;
-        }
-
-        while (!running_executions.empty()) {
-            Source_Execution<T> * execution = running_executions.front();
-            running_executions.pop_front();
-            delete execution;
-        }
-
-        clCheckError(clReleaseCommandQueue(queue));
-    }
-
-};
-
-template <typename T>
-struct SourceTask
-{
-    OCL & ocl;
-    size_t max_batch_size;
-    cl_command_queue queue;
-
-    size_t iterations;
-
-    SourceTask(
-        OCL & ocl,
-        const size_t batch_size,
-        const size_t N)
-    : ocl(ocl)
-    , max_batch_size(next_pow2(batch_size))
-    , iterations(0)
-    {
-        (void)N;
-        if (batch_size != max_batch_size) {
-            std::cout << "fx::Source: `batch_size` is rounded to the next power of 2 ("
-                      << batch_size << " -> " << max_batch_size << ")" << std::endl;
-        }
-
-        queue = ocl.createCommandQueue(true);
-    }
-
-    Source_Execution<T> * get_task()
-    {
-        Source_Execution<T> * execution = new Source_Execution<T>(ocl, queue, max_batch_size, iterations);
-        return execution;
-    }
-
-    void push(
-        Source_Execution<T> * execution,
-        const bool last = false)
-    {
-        execution->execute(last);
-        iterations++;
-    }
-
-    void launch_kernels() {}
-
-    void finish()
-    {
-        clFinish(queue);
-    }
-
-    ~SourceTask()
-    {
-        finish();
-
-        clCheckError(clReleaseCommandQueue(queue));
-    }
-
-};
-
-template <typename T>
-    struct Sink_Execution {
-
-        OCL & ocl;
-        cl_command_queue queue;
-        cl_mem batch_d;
-        cl_mem count_d;
-        // TODO: verificare che const non dia problemi
-        const cl_mem * eos_d;       // contains a reference of a global eos
-
-        T * batch_h;
-        cl_int * count_h;
-
-        cl_kernel kernel;
-        cl_event kernel_event;
-        cl_event migrate_event;
-
-        Sink_Execution(
-            OCL & ocl,
-            cl_command_queue queue,
-            size_t batch_size,
-            const cl_mem * eos_d)
-        : ocl(ocl)
-        // , queue(queue)
-        , queue(ocl.createCommandQueue(true))
-        , batch_d(nullptr)
-        , count_d(nullptr)
-        , eos_d(eos_d)
-        , batch_h(nullptr)
-        , count_h(0)
-        {
-            cl_int err;
-
-            kernel = ocl.createKernel("memory_writer");
-
-            batch_h = aligned_alloc<T>(batch_size);
-
-            cl_mem_ext_ptr_t batch_ext;
-            batch_ext.obj = batch_h;
-            batch_ext.param = 0;
-            batch_ext.flags = pc_[30];
-
-            // TODO: usare MAP/UNMAP puo' essere meglio?
-            batch_d = clCreateBuffer(
-                ocl.context,
-                CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY | CL_MEM_HOST_READ_ONLY | CL_MEM_EXT_PTR_XILINX,
-                batch_size * sizeof(T), &batch_ext,
-                &err
-            );
-            clCheckErrorMsg(err, "Failed to create batch_d");
-
-            count_h = aligned_alloc<cl_int>(1);
-
-            cl_mem_ext_ptr_t count_ext;
-            count_ext.obj = count_h;
-            count_ext.param = 0;
-            count_ext.flags = pc_[31];
-
-            count_d = clCreateBuffer(
-                ocl.context,
-                CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY | CL_MEM_HOST_READ_ONLY | CL_MEM_EXT_PTR_XILINX,
-                sizeof(cl_int), &count_ext,
-                &err
-            );
-            clCheckErrorMsg(err, "Failed to create count_d");
-
-            const cl_int _batch_size = static_cast<cl_int>(batch_size * sizeof(T));
-
-            cl_uint argi = 1;
-            clCheckError(clSetKernelArg(kernel, argi++, sizeof(batch_d),     &batch_d));
-            clCheckError(clSetKernelArg(kernel, argi++, sizeof(_batch_size), &_batch_size));
-            clCheckError(clSetKernelArg(kernel, argi++, sizeof(count_d),     &count_d));
-            clCheckError(clSetKernelArg(kernel, argi++, sizeof(*eos_d),      eos_d));
-        }
-
-        void execute()
-        {
-            clCheckError(clEnqueueTask(queue, kernel, 0, nullptr, &kernel_event));
-            // clFlush(queue);
-
-            cl_mem buffers[] = {batch_d, count_d, *eos_d};
-            clCheckError(clEnqueueMigrateMemObjects(
-                queue, 3, buffers,
-                CL_MIGRATE_MEM_OBJECT_HOST,
-                1, &kernel_event, &migrate_event
-            ));
-            // clFlush(queue);
-        }
-
-        void wait()
-        {
-            clCheckError(clWaitForEvents(1, &migrate_event));
-            clCheckError(clReleaseEvent(kernel_event));
-            clCheckError(clReleaseEvent(migrate_event));
-        }
-
-        ~Sink_Execution() {
-            clReleaseMemObject(batch_d);
-            clReleaseMemObject(count_d);
-            clReleaseKernel(kernel);
-
-            free(count_h);
-            free(batch_h);
-        }
-    };
-
-template <typename T>
-struct Sink
-{
-    OCL & ocl;
-
-    size_t max_batch_size;
-    size_t number_of_buffers;
-    size_t iterations;
-
-    cl_command_queue queue;
-
-    cl_mem eos_d;
-    cl_int * eos;
-
-    std::deque<Sink_Execution<T> *> waiting_executions;
-    std::deque<Sink_Execution<T> *> running_executions;
-
-    Sink(OCL & ocl_,
-        const size_t batch_size,
-        const size_t N)
-    : ocl(ocl_)
-    , max_batch_size(next_pow2(batch_size))
-    , number_of_buffers(N)
-    , iterations(0)
-    {
-        if (batch_size != max_batch_size) {
-            std::cout << "fx::Sink: `batch_size` is rounded to the next power of 2 ("
-                      << batch_size << " -> " << max_batch_size << ")" << std::endl;
-        }
-
-        cl_int err;
-
-        queue = ocl.createCommandQueue();
-
-        eos = aligned_alloc<cl_int>(1);
-        *eos = 0;
-
-        cl_mem_ext_ptr_t eos_ext;
-        eos_ext.obj = eos;
-        eos_ext.param = 0;
-        eos_ext.flags = pc_[31];
-
-        eos_d = clCreateBuffer(
-            ocl.context,
-            CL_MEM_USE_HOST_PTR | CL_MEM_READ_WRITE | CL_MEM_EXT_PTR_XILINX,
-            sizeof(cl_int), &eos_ext,
-            &err
-        );
-        clCheckErrorMsg(err, "Failed to create eos_d");
-
-        clCheckError(clEnqueueWriteBuffer(
-            queue, eos_d, CL_TRUE,
-            0, sizeof(cl_int), eos,
-            0, nullptr, nullptr
-        ));
-
-        for (size_t n = 0; n < number_of_buffers; ++n) {
-            waiting_executions.push_back(new Sink_Execution<T>(ocl, queue, max_batch_size, &eos_d));
-        }
-
-        for (size_t n = 0; n < number_of_buffers; ++n) {
-            launch_kernel();
-        }
-    }
-
-    void launch_kernel()
-    {
-        Sink_Execution<T> * execution = waiting_executions.front();
-        waiting_executions.pop_front();
-        execution->execute();
-        running_executions.push_back(execution);
-    }
-
-    T * pop(
-        size_t * count,
-        bool * last)
-    {
-        if (running_executions.empty()) {
-            std::cerr << "fx::Sink: no launched executions" << std::endl;
-            exit(1);
-        }
-
-        Sink_Execution<T> * execution = running_executions.front();
-        running_executions.pop_front();
-        execution->wait();
-
-        T * batch = execution->batch_h;
-        *count = execution->count_h[0];
-        *last = eos[0];
-
-        waiting_executions.push_back(execution);
-
-        iterations++;
-
-        return batch;
-    }
-
-    void put_batch(T * batch)
-    {
-        if (!batch) {
-            std::cerr << "fx::Source: batch is nullptr" << std::endl;
-            exit(1);
-        }
-
-        launch_kernel();
-    }
-
-    void launch_kernels() {}
-
-    void finish()
-    {
-        while (!running_executions.empty()) {
-            Sink_Execution<T> * execution = running_executions.front();
-            running_executions.pop_front();
-            execution->wait();
-            waiting_executions.push_back(execution);
-        }
-
-        clFinish(queue);
-    }
-
-    ~Sink()
-    {
-        finish();
-
-        while (!waiting_executions.empty()) {
-            Sink_Execution<T> * execution = waiting_executions.front();
-            waiting_executions.pop_front();
-            delete execution;
-        }
-
-        while (!running_executions.empty()) {
-            Sink_Execution<T> * execution = running_executions.front();
-            running_executions.pop_front();
-            delete execution;
-        }
-
-        clCheckError(clReleaseCommandQueue(queue));
-
-        clReleaseMemObject(eos_d);
-        free(eos);
-    }
-};
-}
-
-void source_thread(
-    OCL & ocl,
-    std::vector<record_t> & dataset,
-    size_t n,
-    size_t batch_size,
-    size_t max_keys,
-    size_t iterations
+void mr_thread(
+    const size_t idx,
+    fx::OCL & ocl,
+    const std::vector<record_t> & dataset,
+    const size_t iterations,
+    const size_t num_batches,
+    const size_t batch_size
 )
 {
-#if 1
-    fx::Source<record_t> source(ocl, batch_size, n);
+    fx::MemoryReader<record_t> mr(ocl, batch_size, num_batches, idx);
+    size_t _tuples_sent = 0;
+    size_t _batch_sent = 0;
 
-    std::cout << "Waiting for barrier..." << std::endl;
     pthread_barrier_wait(&barrier);
 
-    auto timestart_source = get_time();
+    const auto time_start = get_time();
     for (size_t it = 0; it < iterations; ++it) {
-        record_t * batch = source.get_batch();
-        // auto fill_timestart = get_time();
-        fill_batch_with_dataset(dataset, batch, batch_size);
-        // auto fill_timeend = get_time();
-        // print_time<record_t>("fill_batch", batch_size, fill_timestart, fill_timeend);
+        record_t * batch = mr.get_batch();
 
-        // std::cout << "Source: " << it << " push()" <<  std::endl;
-        source.push(batch, batch_size, (it == (iterations - 1)));
-    }
-    source.finish();
-    auto timeend_source = get_time();
-    print_time<record_t>("source", iterations * batch_size, timestart_source, timeend_source);
+#if DEBUG_MR_PRINT_FILL_BW
+        const auto fill_time_start = get_time();
+        fill_batch_with_dataset(dataset, batch, batch_size);
+        const auto fill_time_end = get_time();
+        print_time<record_t>("MR " + std::to_string(idx) + ": fill", batch_size, fill_time_start, fill_time_end);
 #else
-
-    fx::SourceTask<record_t> source_task(ocl, batch_size, n);
-
-    std::cout << "Waiting for barrier..." << std::endl;
-    pthread_barrier_wait(&barrier);
-
-    auto timestart_source = get_time();
-    for (size_t it = 0; it < iterations; ++it) {
-        fx::Source_Execution<record_t> * execution = source_task.get_task();
-        record_t * batch = execution->batch_h;
         fill_batch_with_dataset(dataset, batch, batch_size);
-        source_task.push(execution, (it == (iterations - 1)));
-    }
-    source_task.finish();
-    auto timeend_source = get_time();
-    print_time<record_t>("source", iterations * batch_size, timestart_source, timeend_source);
 #endif
+
+        mr.push(batch, batch_size, (it == (iterations - 1)));
+        _tuples_sent += batch_size;
+        _batch_sent++;
+    }
+
+    mr.finish();
+    const auto time_end = get_time();
+
+    tuples_sent += _tuples_sent;
+    batches_sent += _batch_sent;
+
+    print_time<record_t>("MR " + std::to_string(idx), _tuples_sent, time_start, time_end);
+    // print_time<record_t>("MR " + std::to_string(idx) + "(precise)", iterations * batch_size, mr.get_start_time(), mr.get_end_time());
 }
 
-void sink_thread(
-    OCL & ocl,
-    size_t batch_size,
-    size_t n
+void mw_thread(
+    const size_t idx,
+    fx::OCL & ocl,
+    const size_t num_batches,
+    const size_t batch_size
 )
 {
-    fx::Sink<record_t> sink(ocl, batch_size, n);
+    fx::MemoryWriter<record_t> mw(ocl, batch_size, num_batches, idx);
+    size_t _tuples_received = 0;
+    size_t _batch_received = 0;
 
-    std::cout << "Waiting for barrier..." << std::endl;
     pthread_barrier_wait(&barrier);
+    mw.prelaunch();
 
-    size_t it = 0;
     bool done = false;
-    auto timestart_sink = get_time();
+    const auto time_start = get_time();
     while(!done) {
+        size_t count = 0;
+        record_t * batch = mw.pop(&count, &done);
 
-        size_t out_count;
-        bool eos;
-        record_t * batch = sink.pop(&out_count, &eos);
+        size_t num_tuples = count * ((512 / 8) / sizeof(record_t));
 
-        // size_t real_count = out_count * ((512 / 8) / sizeof(record_t));
-        // std::cout
-        //     << "sink (" << it
-        //     << ", " << real_count
-        //     << ", " << (eos == 0 ? false: true)
-        //     <<  ")"
-        //     << std::endl;
+#if DEBUG_MW_PRINT_BATCH
+        std::cout
+            << "MW (" << _batch_received
+            << ", " << num_tuples
+            << ", " << done
+            <<  ")\n";
 
-        sink.put_batch(batch);
+           for (size_t i = 0; i < DEBUG_MW_NUM_TUPLES_TO_PRINT; ++i) {
+                print_record(batch[i]);
+            }
+#endif
 
-        // for (size_t j = 0; j < real_count; ++j) {
-        //     print_record(batch[j]);
-        // }
-
-        done = (eos == 0 ? false : true);
-        it++;
+        mw.put_batch(batch, batch_size);
+        _tuples_received += num_tuples;
+        _batch_received++;
     }
 
-    sink.finish();
+    mw.finish();
+    const auto time_end = get_time();
 
-    _n_sink = it;
-    auto timeend_sink = get_time();
-    print_time<record_t>("sink", it * batch_size, timestart_sink, timeend_sink);
+    tuples_received += _tuples_received;
+    batches_received += _batch_received;
+    print_time<record_t>("MW " + std::to_string(idx), _tuples_received, time_start, time_end);
 }
 
 int main(int argc, char** argv) {
@@ -716,74 +207,104 @@ int main(int argc, char** argv) {
     argc--;
     argv++;
 
-    std::string bitstreamFilename  = "./sd.xclbin";
+    std::string bitstream  = "./kernels/th111/hw/th111.xclbin";
     size_t iterations = 1;
-    size_t n_source = 1;
-    size_t n_sink = 1;
-    size_t source_batch_size = 1 << 5;
-    size_t sink_batch_size = 1 << 5;
-    size_t max_keys = record_t::MAX_KEY_VALUE;
+    size_t mr_num_threads = 1;
+    size_t mw_num_threads = 1;
+    size_t mr_num_buffers = 1;
+    size_t mw_num_buffers = 1;
+    size_t mr_batch_size = 1 << 5;
+    size_t mw_batch_size = 1 << 5;
 
     int argi = 0;
-    if (argc > argi) bitstreamFilename  = argv[argi++];
-    if (argc > argi) iterations         = atoi(argv[argi++]);
-    if (argc > argi) n_source           = atoi(argv[argi++]);
-    if (argc > argi) n_sink             = atoi(argv[argi++]);
-    if (argc > argi) source_batch_size  = atoi(argv[argi++]);
-    if (argc > argi) sink_batch_size    = atoi(argv[argi++]);
-    if (argc > argi) max_keys           = atoi(argv[argi++]);
+    if (argc > argi) bitstream      = argv[argi++];
+    if (argc > argi) iterations     = atoi(argv[argi++]);
+    if (argc > argi) mr_num_threads = atoi(argv[argi++]);
+    if (argc > argi) mw_num_threads = atoi(argv[argi++]);
+    if (argc > argi) mr_num_buffers = atoi(argv[argi++]);
+    if (argc > argi) mw_num_buffers = atoi(argv[argi++]);
+    if (argc > argi) mr_batch_size  = atoi(argv[argi++]);
+    if (argc > argi) mw_batch_size  = atoi(argv[argi++]);
 
-    size_t data_transfer_size = (sizeof(record_t) * n_source * source_batch_size) / 1024;
+    const size_t transfer_size = sizeof(record_t) * mr_batch_size / 1024;
 
     std::cout
-        << COUT_HEADER << "bitstream: "        <<                 bitstreamFilename  << "\n"
-        << COUT_HEADER << "iterations"         << COUT_INTEGER << iterations         << "\n"
-        << COUT_HEADER << "n_source"           << COUT_INTEGER << n_source           << "\n"
-        << COUT_HEADER << "n_sink"             << COUT_INTEGER << n_sink             << "\n"
-        << COUT_HEADER << "source_batch_size"  << COUT_INTEGER << source_batch_size  << "\n"
-        << COUT_HEADER << "sink_batch_Size"    << COUT_INTEGER << sink_batch_size    << "\n"
-        << COUT_HEADER << "data_transfer_size" << COUT_INTEGER << data_transfer_size << " KB\n"
-        << std::endl;
+        << COUT_HEADER << "bitstream: "      <<                 bitstream      << "\n"
+        << COUT_HEADER << "iterations: "     << COUT_INTEGER << iterations     << "\n"
+        << COUT_HEADER << "mr_num_threads: " << COUT_INTEGER << mr_num_threads << "\n"
+        << COUT_HEADER << "mw_num_threads: " << COUT_INTEGER << mw_num_threads << "\n"
+        << COUT_HEADER << "mr_num_buffers: " << COUT_INTEGER << mr_num_buffers << "\n"
+        << COUT_HEADER << "mw_num_buffers: " << COUT_INTEGER << mw_num_buffers << "\n"
+        << COUT_HEADER << "mr_batch_size: "  << COUT_INTEGER << mr_batch_size  << "\n"
+        << COUT_HEADER << "mw_batch_size: "  << COUT_INTEGER << mw_batch_size  << "\n"
+        << COUT_HEADER << "transfer_size: "  << COUT_INTEGER << transfer_size  << " KB\n"
+        << '\n';
+
+    std::vector<std::vector<record_t>> datasets;
+    for (size_t i = 0; i < mr_num_threads; ++i) {
+        datasets.push_back(generate_dataset(mr_batch_size));
+    }
+
+    pthread_barrier_init(&barrier, nullptr, mr_num_threads + mw_num_threads + 1); // +1 for main thread
+    tuples_sent = 0;
+    batches_sent = 0;
+    tuples_received = 0;
+    batches_received = 0;
 
 
-    OCL ocl = OCL(bitstreamFilename, 0, 0, true);
+    auto time_start = get_time();
 
-    std::vector<record_t> dataset = generate_dataset(source_batch_size);
-    std::cout << dataset.size() << " tuples loaded!" << std::endl;
+    fx::OCL ocl = fx::OCL(bitstream, 0, 0, true);
 
-    pthread_barrier_init(&barrier, nullptr, 2);
+    std::vector<std::thread> mr_threads;
+    for (size_t i = 0; i < mr_num_threads; ++i) {
+        mr_threads.push_back(
+            std::thread(
+                mr_thread,
+                i,
+                std::ref(ocl),
+                std::ref(datasets[i]),
+                iterations,
+                mr_num_buffers,
+                mr_batch_size
+            )
+        );
+    }
 
-    auto timeStart = std::chrono::high_resolution_clock::now();
+    std::vector<std::thread> mw_threads;
+    for (size_t i = 0; i < mw_num_threads; ++i) {
+        mw_threads.push_back(
+            std::thread(
+                mw_thread,
+                i,
+                std::ref(ocl),
+                mw_num_buffers,
+                mw_batch_size
+            )
+        );
+    }
 
-    std::thread th_source(
-        source_thread,
-        std::ref(ocl),
-        std::ref(dataset),
-        n_source,
-        source_batch_size,
-        max_keys,
-        iterations
-    );
+    pthread_barrier_wait(&barrier);
 
-    std::thread th_sink(
-        sink_thread,
-        std::ref(ocl),
-        sink_batch_size,
-        n_sink
-    );
+    auto time_start_compute = get_time();
 
-    th_source.join();
-    th_sink.join();
+    for (auto& t : mr_threads) t.join();
+    for (auto& t : mw_threads) t.join();
 
-    auto timeEnd = std::chrono::high_resolution_clock::now();
+    auto time_end = get_time();
 
-    // std::cout << COUT_HEADER << "n_sink: " << COUT_INTEGER << n_sink << std::endl;
-    print_time<record_t>("overall(source)", iterations * source_batch_size, timeStart, timeEnd);
-    print_time<record_t>("overall(sink)", _n_sink * sink_batch_size, timeStart, timeEnd);
-    print_time<record_t>("overall", iterations * source_batch_size, timeStart, timeEnd, false);
+
+    auto time_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
+    print_time<record_t>("MR (compute)", tuples_sent, time_start_compute, time_end, fx::COLOR_LIGHT_GREEN);
+    print_time<record_t>("MW (compute)", tuples_received, time_start_compute, time_end, fx::COLOR_LIGHT_GREEN);
+    print_time<record_t>("APP (compute)", tuples_received, time_start_compute, time_end, fx::COLOR_LIGHT_GREEN);
+    print_time<record_t>("MR (overall)", tuples_sent, time_start, time_end);
+    print_time<record_t>("MW (overall)", tuples_received, time_start, time_end);
+    print_time<record_t>("APP (overall)", tuples_sent, time_start, time_end);
+    std::cout << COUT_HEADER_SMALL << "Total HOST time: " << COUT_INTEGER << time_elapsed << " ms\n";
+
 
     pthread_barrier_destroy(&barrier);
-
     ocl.clean();
 
     bool match = true;
