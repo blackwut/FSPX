@@ -46,13 +46,13 @@ int main(int argc, char** argv) {
     double KTuplesPerSecond = tuplePerSecond / 1000.0;
     double MTuplesPerSecond = tuplePerSecond / 1000000.0;
 
-    std::cout << "Time Host (overall): " << std::chrono::duration_cast<std::chrono::milliseconds>(host_end - host_overallStart).count() << " ms" << std::endl;
-    std::cout << "Time Host (kernel): " << std::chrono::duration_cast<std::chrono::milliseconds>(host_end - host_kernelStart).count() << " ms" << std::endl;
-    std::cout << "Time: " << time_s << " s" << std::endl;
-    std::cout << "Bandwidth: " << bandwidth_gbs << " GB/s" << std::endl;
-    std::cout << "Tuples per second: " << tuplePerSecond << std::endl;
-    std::cout << "KTuples per second: " << KTuplesPerSecond << std::endl;
-    std::cout << "MTuples per second: " << MTuplesPerSecond << std::endl;
+    std::cout << "Time Host (overall): " << std::chrono::duration_cast<std::chrono::milliseconds>(host_end - host_overallStart).count() << " ms" << '\n';
+    std::cout << "Time Host (kernel): " << std::chrono::duration_cast<std::chrono::milliseconds>(host_end - host_kernelStart).count() << " ms" << '\n';
+    std::cout << "Time: " << time_s << " s" << '\n';
+    std::cout << "Bandwidth: " << bandwidth_gbs << " GB/s" << '\n';
+    std::cout << "Tuples per second: " << tuplePerSecond << '\n';
+    std::cout << "KTuples per second: " << KTuplesPerSecond << '\n';
+    std::cout << "MTuples per second: " << MTuplesPerSecond << '\n';
 
     ocl.clean();
 

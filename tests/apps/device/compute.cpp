@@ -113,7 +113,7 @@ struct RecordGenerator {
 struct RecordDrainer {
     void operator()(const int i, const record_t & in, const bool last) {
     #pragma HLS INLINE
-        // std::cout << "index:" << i << ", key: " << in.key << ", val: " << in.val << std::endl;
+        // std::cout << "index:" << i << ", key: " << in.key << ", val: " << in.val << '\n';
     }
 };
 
