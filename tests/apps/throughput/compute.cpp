@@ -3,9 +3,9 @@
 #include "constants.hpp"
 #include "tuple.hpp"
 
-#define SO_PAR 4
-#define IN_PAR 4
-#define SI_PAR 4
+// #define MR_PAR 4
+// #define MAP_PAR 4
+// #define MW_PAR 4
 
 
 template <
@@ -67,19 +67,19 @@ struct Incrementer {
 
 extern "C" {
 void compute(
-    axis_stream_t in[SO_PAR],
-    axis_stream_t out[SI_PAR]
+    axis_stream_t in[MR_PAR],
+    axis_stream_t out[MW_PAR]
 )
 {
     #pragma HLS interface ap_ctrl_none port=return
 
     #pragma HLS DATAFLOW
 
-    stream_t emitter_incrementer[SO_PAR][IN_PAR];
-    stream_t incrementer_collector[IN_PAR][SI_PAR];
+    stream_t emitter_incrementer[MR_PAR][MAP_PAR];
+    stream_t incrementer_collector[MAP_PAR][MW_PAR];
 
-    fx::A2A::Emitter_RR<SO_PAR, IN_PAR>(in, emitter_incrementer);
-    A2A_Map<Incrementer, SO_PAR, IN_PAR, SI_PAR>(emitter_incrementer, incrementer_collector);
-    fx::A2A::Collector_RR<IN_PAR, SI_PAR>(incrementer_collector, out);
+    fx::A2A::Emitter_RR<MR_PAR, MAP_PAR>(in, emitter_incrementer);
+    A2A_Map<Incrementer, MR_PAR, MAP_PAR, MW_PAR>(emitter_incrementer, incrementer_collector);
+    fx::A2A::Collector_RR<MAP_PAR, MW_PAR>(incrementer_collector, out);
 }
 }

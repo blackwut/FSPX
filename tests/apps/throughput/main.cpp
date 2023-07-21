@@ -6,6 +6,7 @@
 #include <thread>
 #include <pthread.h>
 #include <mutex>
+#include <fstream>
 
 
 #include "fspx_host.hpp"
@@ -121,11 +122,13 @@ void mr_thread(
     const size_t batch_size
 )
 {
-    fx::MemoryReader<record_t> mr(ocl, batch_size, num_batches, idx);
+    fx::MemoryReader<record_t> mr(ocl, batch_size, num_batches, idx + 1);
     size_t _tuples_sent = 0;
     size_t _batch_sent = 0;
 
     pthread_barrier_wait(&barrier);
+
+    // std::this_thread::sleep_for(std::chrono::milliseconds(5 * idx));
 
     const auto time_start = get_time();
     for (size_t it = 0; it < iterations; ++it) {
@@ -162,7 +165,7 @@ void mw_thread(
     const size_t batch_size
 )
 {
-    fx::MemoryWriter<record_t> mw(ocl, batch_size, num_batches, idx);
+    fx::MemoryWriter<record_t> mw(ocl, batch_size, num_batches, idx + 1);
     size_t _tuples_received = 0;
     size_t _batch_received = 0;
 
@@ -294,6 +297,7 @@ int main(int argc, char** argv) {
     auto time_end = get_time();
 
 
+    auto time_elapsed_compute_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(time_end - time_start_compute).count();
     auto time_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
     print_time<record_t>("MR (compute)", tuples_sent, time_start_compute, time_end, fx::COLOR_LIGHT_GREEN);
     print_time<record_t>("MW (compute)", tuples_received, time_start_compute, time_end, fx::COLOR_LIGHT_GREEN);
@@ -303,9 +307,60 @@ int main(int argc, char** argv) {
     print_time<record_t>("APP (overall)", tuples_sent, time_start, time_end);
     std::cout << COUT_HEADER_SMALL << "Total HOST time: " << COUT_INTEGER << time_elapsed << " ms\n";
 
-
     pthread_barrier_destroy(&barrier);
     ocl.clean();
+
+    size_t tuples_sec = tuples_sent / (time_elapsed_compute_ns / 1e9);
+    size_t bytes_sec = tuples_sec * sizeof(record_t);
+
+    // dump results to file in append mode
+    // if the file is empty or not exists, print the header
+    bool print_header = false;
+    std::ifstream infile("results.csv");
+    if (!infile.good()) {
+        print_header = true;
+    }
+    infile.close();
+
+    std::ofstream outfile("results.csv", std::ios_base::app);
+    if (print_header) {
+        outfile << "bitstream,"
+                << "iterations,"
+                << "mr_num_threads,"
+                << "mw_num_threads,"
+                << "mr_num_buffers,"
+                << "mw_num_buffers,"
+                << "mr_batch_size,"
+                << "mw_batch_size,"
+                << "transfer_size,"
+                << "time_elapsed_ms,"
+                << "time_elapsed_compute_ns,"
+                << "tuples_sent,"
+                << "batches_sent,"
+                << "tuples_received,"
+                << "batches_received,"
+                << "tuples_sec,"
+                << "bytes_sec\n";
+    }
+
+    outfile << bitstream << ","
+            << iterations << ","
+            << mr_num_threads << ","
+            << mw_num_threads << ","
+            << mr_num_buffers << ","
+            << mw_num_buffers << ","
+            << mr_batch_size << ","
+            << mw_batch_size << ","
+            << transfer_size << ","
+            << time_elapsed << ","
+            << time_elapsed_compute_ns << ","
+            << tuples_sent << ","
+            << batches_sent << ","
+            << tuples_received << ","
+            << batches_received << ","
+            << tuples_sec << ","
+            << bytes_sec << "\n";
+    outfile.close();
 
     bool match = true;
     return (match ? EXIT_SUCCESS : EXIT_FAILURE);
