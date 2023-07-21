@@ -460,14 +460,14 @@ struct OCL
         }
     }
 
-    cl_command_queue createCommandQueue(bool out_of_order = false) {
+    cl_command_queue createCommandQueue(bool profile = true, bool out_of_order = false) {
         cl_int status;
         cl_command_queue queue;
-        if (out_of_order) {
-            queue = clCreateCommandQueue(context, device, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE | CL_QUEUE_PROFILING_ENABLE, &status);
-        } else {
-            queue = clCreateCommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, &status);
-        }
+        queue = clCreateCommandQueue(
+            context, device,
+            (profile ? CL_QUEUE_PROFILING_ENABLE : 0) | (out_of_order ? CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE : 0),
+            &status
+        );
         clCheckErrorMsg(status, "Failed to create command queue");
         return queue;
     }
