@@ -71,7 +71,7 @@ void print_time(
             << COUT_HEADER << name
             << COUT_HEADER << "\tTime: "       << COUT_FLOAT << timeDiff / 1000 << " ms"
             << COUT_HEADER << "\tThroughput: " << COUT_FLOAT << thr             << " MB/s"
-            << std::endl;
+            << '\n';
     } else {
         double thr = number_of_tuples;
         thr /= timeDiff;
@@ -81,7 +81,7 @@ void print_time(
             << COUT_HEADER << name
             << COUT_HEADER << "\tTime: "       << COUT_FLOAT   << timeDiff / 1000  << " ms"
             << COUT_HEADER << "\tKTuple/sec: " << COUT_INTEGER << tuple_sec
-            << std::endl;
+            << '\n';
     }
 }
 
@@ -109,7 +109,7 @@ struct XilinxContext
             auto d = devices[i];
             OCL_CHECK(err, context = cl::Context(d, nullptr, nullptr, nullptr, &err));
 
-            std::cout << "Trying to program device[" << i << "]: " << d.getInfo<CL_DEVICE_NAME>() << std::endl;
+            std::cout << "Trying to program device[" << i << "]: " << d.getInfo<CL_DEVICE_NAME>() << '\n';
             program = cl::Program(context, {d}, bins, nullptr, &err);
             if (err != CL_SUCCESS) {
                 std::cout << "Failed to program device[" << i << "] with xclbin file!\n";
@@ -236,7 +236,7 @@ static void print_record(const record_t & r)
     << r.incremental_average << ", "
     << r.timestamp
     << ")"
-    << std::endl;
+    << '\n';
 }
 
 void fill_batch(Batch_t<record_t> & batch)
@@ -284,7 +284,7 @@ void fill_batch(Batch_t<record_t> & batch)
 //     //     }
 //     // }
 
-//     std::cout << "Waiting for barrier..." << std::endl;
+//     std::cout << "Waiting for barrier..." << '\n';
 //     pthread_barrier_wait(&barrier);
 
 //     auto timestart_source = get_time();
@@ -300,8 +300,8 @@ void fill_batch(Batch_t<record_t> & batch)
 
 //         int in_size = int(batches.currentHostBuffer().size() / (512 / (sizeof(record_t) * 8)));
 //         int eos_int = (i == (iterations - 1) ? 1 : 0);
-//         std::cout << "(source) in_size: " << in_size << std::endl;
-//         std::cout << "(source) eos_int: " << eos_int << std::endl;
+//         std::cout << "(source) in_size: " << in_size << '\n';
+//         std::cout << "(source) eos_int: " << eos_int << '\n';
 
 //         cl_int argi = 0;
 //         OCL_CHECK(err, err = k.setArg(argi++, batches.currentDeviceBuffer()));
@@ -353,7 +353,7 @@ void source_thread(
     //     }
     // }
 
-    std::cout << "Waiting for barrier..." << std::endl;
+    std::cout << "Waiting for barrier..." << '\n';
     pthread_barrier_wait(&barrier);
 
     auto timestart_source = get_time();
@@ -365,8 +365,8 @@ void source_thread(
 
         int in_size = int(batches.currentHostBuffer().size() / (512 / (sizeof(record_t) * 8)));
         int eos_int = (i == (iterations - 1) ? 1 : 0);
-        std::cout << "(source) in_size: " << in_size << std::endl;
-        std::cout << "(source) eos_int: " << eos_int << std::endl;
+        std::cout << "(source) in_size: " << in_size << '\n';
+        std::cout << "(source) eos_int: " << eos_int << '\n';
 
         cl_int argi = 0;
         OCL_CHECK(err, err = k.setArg(argi++, batches.currentDeviceBuffer()));
@@ -395,12 +395,12 @@ void sink_thread(
     CLBuffers<int> written_counts(xcontext, 1, 1, CL_MEM_WRITE_ONLY);
     CLBuffers<int> eos(xcontext, 1, 1, CL_MEM_WRITE_ONLY);
 
-    std::cout << "Waiting for barrier..." << std::endl;
+    std::cout << "Waiting for barrier..." << '\n';
     pthread_barrier_wait(&barrier);
     auto timestart_sink = get_time();
 
     cl_int out_size = int(batches.currentHostBuffer().size() * sizeof(record_t));
-    std::cout << "(sink) out_size: " << out_size << std::endl;
+    std::cout << "(sink) out_size: " << out_size << '\n';
 
 
     size_t it = 0;
@@ -418,7 +418,7 @@ void sink_thread(
     // 2 int out_count,
     // 3 int * written_count,
     // 4 int * eos
-        std::cout << "(sink) enqueueTask()" << std::endl;
+        std::cout << "(sink) enqueueTask()" << '\n';
         OCL_CHECK(err, err = xcontext.queue.enqueueTask(k, nullptr, &kernel_event[0]));
 
         batches.migrateToHost(&kernel_event, true);
@@ -428,8 +428,8 @@ void sink_thread(
         int written_count = written_counts.currentHostBuffer()[0];
         int eos_bool = (eos.currentHostBuffer()[0] != 0);
 
-        std::cout << "sink Elements: " << COUT_INTEGER << written_count << std::endl;
-        std::cout << "     sink EOS: " << COUT_BOOLEAN << eos_bool << std::endl;
+        std::cout << "sink Elements: " << COUT_INTEGER << written_count << '\n';
+        std::cout << "     sink EOS: " << COUT_BOOLEAN << eos_bool << '\n';
 
         for (int i = 0; i < batch_size; ++i) {
             print_record(batches.currentHostBuffer()[i]);
@@ -473,13 +473,13 @@ int main(int argc, char** argv) {
         << COUT_HEADER << "source_batch_size"  << COUT_INTEGER << source_batch_size  << "\n"
         << COUT_HEADER << "sink_batch_Size"    << COUT_INTEGER << sink_batch_size    << "\n"
         << COUT_HEADER << "data_transfer_size" << COUT_INTEGER << data_transfer_size << " KB\n"
-        << std::endl;
+        << '\n';
 
 
     XilinxContext xcontext = XilinxContext(bitstreamFilename);
 
     std::vector<record_t> dataset = get_dataset<record_t>("dataset.dat", TEMPERATURE);
-    std::cout << dataset.size() << " tuples loaded!" << std::endl;
+    std::cout << dataset.size() << " tuples loaded!" << '\n';
 
     pthread_barrier_init(&barrier, NULL, 2);
 
@@ -502,7 +502,7 @@ int main(int argc, char** argv) {
         sink_batch_size
     );
 
-    // std::cout << "Waiting for barrier..." << std::endl;
+    // std::cout << "Waiting for barrier..." << '\n';
     // pthread_barrier_wait(&barrier);
 
     th_source.join();
@@ -511,7 +511,7 @@ int main(int argc, char** argv) {
 
     auto timeEnd = std::chrono::high_resolution_clock::now();
 
-    // std::cout << COUT_HEADER << "n_sink: " << COUT_INTEGER << n_sink << std::endl;
+    // std::cout << COUT_HEADER << "n_sink: " << COUT_INTEGER << n_sink << '\n';
     print_time<record_t>("overall(source)", iterations * source_batch_size, timeStart, timeEnd);
     print_time<record_t>("overall(sink)", n_sink * sink_batch_size, timeStart, timeEnd);
     print_time<record_t>("overall", iterations * source_batch_size, timeStart, timeEnd, false);

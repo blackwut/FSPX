@@ -39,7 +39,7 @@ void print_time(
             << COUT_HEADER << name
             << COUT_HEADER << "\tTime: "       << COUT_FLOAT << timeDiff / 1000 << " ms"
             << COUT_HEADER << "\tThroughput: " << COUT_FLOAT << thr             << " MB/s"
-            << std::endl;
+            << '\n';
     } else {
         double thr = number_of_tuples;
         thr /= timeDiff;
@@ -49,7 +49,7 @@ void print_time(
             << COUT_HEADER << name
             << COUT_HEADER << "\tTime: "       << COUT_FLOAT   << timeDiff / 1000  << " ms"
             << COUT_HEADER << "\tKTuple/sec: " << COUT_INTEGER << tuple_sec
-            << std::endl;
+            << '\n';
     }
 }
 
@@ -76,7 +76,7 @@ void print_record(const record_t & r)
     << r.incremental_average << ", "
     << r.timestamp
     << ")"
-    << std::endl;
+    << '\n';
 }
 
 void print_batch(record_t * batch, size_t size)
@@ -188,7 +188,7 @@ struct Source_Execution
 
     void execute(bool eos)
     {
-        // std::cout << "Executing SourceExecution: " << i << std::endl;
+        // std::cout << "Executing SourceExecution: " << i << '\n';
         const cl_int count_int = static_cast<cl_int>(batch_size / ((512 / 8) / sizeof(T)));
         const cl_int eos_int = static_cast<cl_int>(eos);
 
@@ -215,7 +215,7 @@ struct Source_Execution
 
     void wait()
     {
-        // std::cout << "Waiting SourceExecution: " << i << std::endl;
+        // std::cout << "Waiting SourceExecution: " << i << '\n';
         clWaitForEvents(1, &kernel_event);
         clCheckError(clReleaseEvent(kernel_event));
         clCheckError(clReleaseEvent(migrate_event));
@@ -262,7 +262,7 @@ struct Source
     {
         if (batch_size != max_batch_size) {
             std::cout << "fx::Source: `batch_size` is rounded to the next power of 2 ("
-                      << batch_size << " -> " << max_batch_size << ")" << std::endl;
+                      << batch_size << " -> " << max_batch_size << ")" << '\n';
         }
 
         queue = ocl.createCommandQueue();
@@ -278,7 +278,7 @@ struct Source
         running_executions.pop_front();
 
         if (iterations >= number_of_buffers) {
-            // std::cout << "iteration: " << iterations << std::endl;
+            // std::cout << "iteration: " << iterations << '\n';
             execution->wait();
         }
 
@@ -308,7 +308,7 @@ struct Source
         while (!running_executions.empty()) {
             Source_Execution<T> * execution = running_executions.front();
             running_executions.pop_front();
-            std::cout << "Waiting for Source_Execution: " << execution->i << std::endl;
+            std::cout << "Waiting for Source_Execution: " << execution->i << '\n';
             execution->wait();
             waiting_executions.push_back(execution);
         }
@@ -357,7 +357,7 @@ struct SourceTask
         (void)N;
         if (batch_size != max_batch_size) {
             std::cout << "fx::Source: `batch_size` is rounded to the next power of 2 ("
-                      << batch_size << " -> " << max_batch_size << ")" << std::endl;
+                      << batch_size << " -> " << max_batch_size << ")" << '\n';
         }
 
         queue = ocl.createCommandQueue(true);
@@ -525,7 +525,7 @@ struct Sink
     {
         if (batch_size != max_batch_size) {
             std::cout << "fx::Sink: `batch_size` is rounded to the next power of 2 ("
-                      << batch_size << " -> " << max_batch_size << ")" << std::endl;
+                      << batch_size << " -> " << max_batch_size << ")" << '\n';
         }
 
         cl_int err;
@@ -576,7 +576,7 @@ struct Sink
         bool * last)
     {
         if (running_executions.empty()) {
-            std::cerr << "fx::Sink: no launched executions" << std::endl;
+            std::cerr << "fx::Sink: no launched executions" << '\n';
             exit(1);
         }
 
@@ -598,7 +598,7 @@ struct Sink
     void put_batch(T * batch)
     {
         if (!batch) {
-            std::cerr << "fx::Source: batch is nullptr" << std::endl;
+            std::cerr << "fx::Source: batch is nullptr" << '\n';
             exit(1);
         }
 
@@ -656,7 +656,7 @@ void source_thread(
 #if 1
     fx::Source<record_t> source(ocl, batch_size, n, idx);
 
-    std::cout << "Waiting for barrier..." << std::endl;
+    std::cout << "Waiting for barrier..." << '\n';
     pthread_barrier_wait(&barrier);
 
     auto timestart_source = get_time();
@@ -667,7 +667,7 @@ void source_thread(
         // auto fill_timeend = get_time();
         // print_time<record_t>("fill_batch", batch_size, fill_timestart, fill_timeend);
 
-        // std::cout << "Source: " << it << " push()" <<  std::endl;
+        // std::cout << "Source: " << it << " push()" <<  '\n';
         source.push(batch, batch_size, (it == (iterations - 1)));
     }
     source.finish();
@@ -677,7 +677,7 @@ void source_thread(
 
     fx::SourceTask<record_t> source_task(ocl, batch_size, n);
 
-    std::cout << "Waiting for barrier..." << std::endl;
+    std::cout << "Waiting for barrier..." << '\n';
     pthread_barrier_wait(&barrier);
 
     auto timestart_source = get_time();
@@ -701,7 +701,7 @@ void sink_thread(
 {
     fx::Sink<record_t> sink(ocl, batch_size, n);
 
-    std::cout << "Waiting for barrier..." << std::endl;
+    std::cout << "Waiting for barrier..." << '\n';
     pthread_barrier_wait(&barrier);
 
     size_t it = 0;
@@ -719,7 +719,7 @@ void sink_thread(
         //     << ", " << real_count
         //     << ", " << (eos == 0 ? false: true)
         //     <<  ")"
-        //     << std::endl;
+        //     << '\n';
 
         sink.put_batch(batch);
 
@@ -770,13 +770,13 @@ int main(int argc, char** argv) {
         << COUT_HEADER << "source_batch_size"  << COUT_INTEGER << source_batch_size  << "\n"
         << COUT_HEADER << "sink_batch_Size"    << COUT_INTEGER << sink_batch_size    << "\n"
         << COUT_HEADER << "data_transfer_size" << COUT_INTEGER << data_transfer_size << " KB\n"
-        << std::endl;
+        << '\n';
 
 
     OCL ocl = OCL(bitstreamFilename, 0, 0, true);
 
     std::vector<record_t> dataset = get_dataset<record_t>("dataset.dat", TEMPERATURE);
-    std::cout << dataset.size() << " tuples loaded!" << std::endl;
+    std::cout << dataset.size() << " tuples loaded!" << '\n';
 
     pthread_barrier_init(&barrier, nullptr, 3);
 
@@ -817,7 +817,7 @@ int main(int argc, char** argv) {
 
     auto timeEnd = std::chrono::high_resolution_clock::now();
 
-    // std::cout << COUT_HEADER << "n_sink: " << COUT_INTEGER << n_sink << std::endl;
+    // std::cout << COUT_HEADER << "n_sink: " << COUT_INTEGER << n_sink << '\n';
     print_time<record_t>("overall(source)", 2 * iterations * source_batch_size, timeStart, timeEnd);
     print_time<record_t>("overall(sink)", _n_sink * sink_batch_size, timeStart, timeEnd);
     print_time<record_t>("overall", 2 * iterations * source_batch_size, timeStart, timeEnd, false);

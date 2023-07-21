@@ -95,7 +95,7 @@ void _clCheckError(const char * file, int line,
         std::cerr << "ERROR: " << clErrorToString(error) << "\n"
                   << "Location: " << file << ":" << line << "\n"
                   << "Message: " << message
-                  << std::endl;
+                  << '\n';
         exit(error);
     }
 }
@@ -109,7 +109,7 @@ void _clCheckError(const char * file, int line,
 
 void clCallback(const char * errinfo, const void *, size_t, void *)
 {
-    std::cerr << "Context callback: " << errinfo << std::endl;
+    std::cerr << "Context callback: " << errinfo << '\n';
 }
 
 std::vector<cl_platform_id> clGetPlatforms()
@@ -156,12 +156,12 @@ cl_platform_id clPromptPlatform()
                       << platformInfo(p, CL_PLATFORM_NAME)     << " "
                       << platformInfo(p, CL_PLATFORM_VENDOR)   << " "
                       << platformInfo(p, CL_PLATFORM_VERSION)
-                      << std::endl;
+                      << '\n';
         }
 
         std::cout << "\nSelect a platform: " << std::flush;
         std::cin >> selected_platform;
-        std::cout << std::endl;
+        std::cout << '\n';
     }
 
     return platforms[selected_platform];
@@ -246,11 +246,11 @@ cl_device_id clPromptDevice(cl_platform_id platform)
                       // << "\tMax Alloc. Memory: " << (deviceInfo<cl_ulong>(d, CL_DEVICE_MAX_MEM_ALLOC_SIZE) >> 20) << " MB\n"
                       // << "\tLocal Memory:      " << (deviceInfo<cl_ulong>(d, CL_DEVICE_LOCAL_MEM_SIZE) >> 10)     << " KB\n"
                       // << "\tAvailable:         " << (deviceInfo<cl_bool>(d, CL_DEVICE_AVAILABLE) ? "YES" : "NO")
-                      << std::endl;
+                      << '\n';
         }
         std::cout << "\nSelect a device: " << std::flush;
         std::cin >> selected_device;
-        std::cout << std::endl;
+        std::cout << '\n';
     }
 
     return devices[selected_device];
@@ -281,14 +281,14 @@ cl_context clCreateContextFor(cl_platform_id platform, cl_device_id device)
 
 char * loadBinaryFile(const std::string & filename, size_t * size)
 {
-    std::cout << "INFO: Importing " << filename << std::endl;
+    std::cout << "INFO: Importing " << filename << '\n';
 
     if (access(filename.c_str(), R_OK) != 0) {
-        std::cerr << "ERROR: " << filename << " xclbin not available" << std::endl;
+        std::cerr << "ERROR: " << filename << " xclbin not available" << '\n';
         exit(1);
     }
 
-    std::cout << "Loading: '" << filename.c_str() << "'" << std::endl;
+    std::cout << "Loading: '" << filename.c_str() << "'" << '\n';
 
     std::ifstream bin_file(filename.c_str(), std::ifstream::binary);
     bin_file.seekg(0, bin_file.end);
@@ -326,7 +326,7 @@ cl_program clCreateBuildProgramFromBinary(cl_context context, const cl_device_id
         clCheckError(clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size));
         std::vector<char> param_value(log_size);
         clCheckError(clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log_size, param_value.data(), NULL));
-        std::cout << std::string(param_value.begin(), param_value.end()) << std::endl;
+        std::cout << std::string(param_value.begin(), param_value.end()) << '\n';
         exit(-1);
     }
 
@@ -455,7 +455,7 @@ struct OCL
             const double time_total = (time_end - time_start) * 1.0e-6;
             std::cout << ": "
                       << COUT_FLOAT << time_total << " ms"
-                      << std::endl;
+                      << '\n';
         }
     }
 

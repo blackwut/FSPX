@@ -34,7 +34,7 @@ static void print_record(const record_t & r)
     << r.incremental_average << ", "
     << r.timestamp
     << ")"
-    << std::endl;
+    << '\n';
 }
 
 static line_t new_line(int i)
