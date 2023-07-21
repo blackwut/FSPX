@@ -50,7 +50,7 @@ struct MemoryWriterExecution {
     {
         cl_int err;
 
-        kernel = ocl.createKernel("memory_writer:{memory_writer_" + std::to_string(replica_id + 1) + "}");
+        kernel = ocl.createKernel("memory_writer:{memory_writer_" + std::to_string(replica_id) + "}");
         queue = ocl.createCommandQueue();
 
         batch_h = aligned_alloc<T>(batch_size);
@@ -203,11 +203,18 @@ struct MemoryWriter
         clCheckErrorMsg(err, "fx::MemoryWriter: failed to create device buffer (eos_d)");
 
         cl_command_queue queue = ocl.createCommandQueue();
-        clCheckError(clEnqueueWriteBuffer(
-            queue, eos_d, CL_TRUE,
-            0, sizeof(cl_int), eos,
+        // clCheckError(clEnqueueWriteBuffer(
+        //     queue, eos_d, CL_TRUE,
+        //     0, sizeof(cl_int), eos,
+        //     0, nullptr, nullptr
+        // ));
+
+        clCheckError(clEnqueueMigrateMemObjects(
+            queue, 1, &eos_d,
+            0,
             0, nullptr, nullptr
         ));
+
         clFinish(queue);
         clCheckError(clReleaseCommandQueue(queue));
 #endif
