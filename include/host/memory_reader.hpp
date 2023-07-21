@@ -158,7 +158,7 @@ struct MemoryReaderExecution
     {
         cl_int err;
 
-        kernel = ocl.createKernel("memory_reader:{memory_reader_" + std::to_string(replica_id + 1) + "}");
+        kernel = ocl.createKernel("memory_reader:{memory_reader_" + std::to_string(replica_id) + "}");
         queue = ocl.createCommandQueue();
 
         batch_h = aligned_alloc<T>(max_batch_size);
