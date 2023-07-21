@@ -18,6 +18,7 @@ void StoS(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     bool last = istrm.read_eos();
@@ -58,6 +59,7 @@ void StoSN_RR(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -99,6 +101,7 @@ void SNtoS_RR(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -152,6 +155,7 @@ void SNMtoS_RR(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -211,6 +215,7 @@ void StoSN_LB(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -254,6 +259,7 @@ void SNtoS_LB(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -303,6 +309,7 @@ void SNtoS_LB(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -358,6 +365,7 @@ void StoSNM_LB(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -403,6 +411,7 @@ void SNMtoS_LB(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -455,6 +464,7 @@ void SNMtoS_LB(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -516,6 +526,7 @@ void StoSN_KB(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     bool last = istrm.read_eos();
@@ -558,6 +569,7 @@ void SNtoS_KB(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int index = 0;
@@ -612,6 +624,7 @@ void SNMtoS_KB(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int index = 0;
@@ -668,6 +681,7 @@ void StoSN_B(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     bool last = istrm.read_eos();
