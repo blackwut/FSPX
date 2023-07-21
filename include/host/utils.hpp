@@ -1,6 +1,8 @@
 #ifndef __HOST_UTILS__
 #define __HOST_UTILS__
 
+#if !defined(__SYNTHESIS__)
+
 #include <type_traits>
 #include <limits>
 #include <cstdint>
@@ -13,17 +15,19 @@
 
 #define ALLOC_ALIGNMENT 4096
 
+#define UNUSED(x) (void)(x)
+
 namespace fx {
 
 template <typename T>
 T * aligned_alloc(const size_t n)
 {
-    T * ptr = NULL;
+    void * ptr = nullptr;
     int ret = posix_memalign((void **)&ptr, ALLOC_ALIGNMENT, n * sizeof(T));
     if (ret != 0) {
         exit(ret);
     }
-    return ptr;
+    return reinterpret_cast<T *>(ptr);
 }
 
 template <typename T>
@@ -31,7 +35,7 @@ struct aligned_allocator {
     using value_type = T;
     T * allocate(std::size_t num) {
         void * ptr = nullptr;
-        if (posix_memalign(&ptr, 4096, num * sizeof(T))) throw std::bad_alloc();
+        if (posix_memalign(&ptr, ALLOC_ALIGNMENT, num * sizeof(T))) throw std::bad_alloc();
         return reinterpret_cast<T*>(ptr);
     }
     void deallocate(T* p, std::size_t num) { free(p); }
@@ -245,5 +249,7 @@ ALWAYS_INLINE std::string colorString(const std::string & text, const std::strin
 }
 
 }
+
+#endif // !defined(__SYNTHESIS__)
 
 #endif // __HOST_UTILS__
