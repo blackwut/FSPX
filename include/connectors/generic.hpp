@@ -675,7 +675,7 @@ template <
     typename STREAM_IN,
     typename STREAM_OUT
 >
-void StoSN_B(
+void StoSN_BR(
     STREAM_IN & istrm,
     STREAM_OUT ostrms[N],
     const char * name = ""
@@ -686,7 +686,7 @@ void StoSN_B(
 
     bool last = istrm.read_eos();
 
-StoSN_B:
+StoSN_BR:
     while (!last) {
     #pragma HLS PIPELINE II = 1
     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
@@ -695,18 +695,18 @@ StoSN_B:
 
         #if defined(__DEBUG__CONNECTORS__)
         std::stringstream ss;
-        ss << "StoSN_B" << " (to: all" << ", last: " << last << ")";
+        ss << "StoSN_BR" << " (to: all" << ", last: " << last << ")";
         print_debug(ss.str(), name, t);
         #endif
 
-    StoSN_B_WRITE:
+    StoSN_BR_WRITE:
         for (int i = 0; i < N; ++i) {
         #pragma HLS UNROLL
             ostrms[i].write(t);
         }
     }
 
-StoSN_B_EOS:
+StoSN_BR_EOS:
     for (int i = 0; i < N; ++i) {
     #pragma HLS UNROLL
         ostrms[i].write_eos();
