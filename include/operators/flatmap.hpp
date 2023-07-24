@@ -5,6 +5,7 @@
 #include "../common.hpp"
 #include "../streams/streams.hpp"
 
+// TODO: Args are not used in the A2A connectors
 
 namespace fx {
 
@@ -40,7 +41,7 @@ struct FlatMapShipper
 template <
     typename FUNCTOR_T,
     typename STREAM_IN,
-    typename STREAM_OUT
+    typename STREAM_OUT,
     typename... Args
 >
 void FlatMap(
