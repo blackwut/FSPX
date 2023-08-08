@@ -54,7 +54,7 @@ void FlatMap(
     using T_OUT = typename STREAM_OUT::data_t;
 
     static FUNCTOR_T func(std::forward<Args>(args)...);
-    static FlatMapShipper<T_OUT> shipper(ostrm);
+    static FlatMapShipper<STREAM_OUT> shipper(ostrm);
 
     bool last = istrm.read_eos();
 

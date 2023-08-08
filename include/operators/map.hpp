@@ -26,7 +26,7 @@ void Map(
 
     bool last = istrm.read_eos();
 
-    FUNCTOR_T func(std::forward<Args>(args)...);
+    static FUNCTOR_T func(std::forward<Args>(args)...);
 
 Map:
     while (!last) {
