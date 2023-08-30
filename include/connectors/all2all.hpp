@@ -142,23 +142,23 @@ void ReplicateOperator(
     #pragma HLS dataflow
 
     // TODO: chose the right depth for the streams
-    fx::stream<typename STREAM_IN::data_t, 16> snm_to;
+    fx::stream<typename STREAM_IN::data_t, 16> snm_to_op;
     fx::stream<typename STREAM_OUT::data_t, 16> op_to_smk;
 
     if constexpr (IN_POLICY_T == RR) {
-        fx::SNMtoS_RR<N, M>(istrms, snm_to, i, "ReplicateOperator_IN_POLICY_RR");
+        fx::SNMtoS_RR<N, M>(istrms, snm_to_op, i, "ReplicateOperator_IN_POLICY_RR");
     } else if constexpr (IN_POLICY_T == LB) {
-        fx::SNMtoS_LB<N, M>(istrms, snm_to, i, "ReplicateOperator_IN_POLICY_LB");
+        fx::SNMtoS_LB<N, M>(istrms, snm_to_op, i, "ReplicateOperator_IN_POLICY_LB");
     } else if constexpr (IN_POLICY_T == KB) {
-        fx::SNMtoS_KB<N, M>(istrms, snm_to, i, key_generator, "ReplicateOperator_IN_POLICY_KB");
+        fx::SNMtoS_KB<N, M>(istrms, snm_to_op, i, key_generator, "ReplicateOperator_IN_POLICY_KB");
     }
 
     if constexpr (OPERATOR_T == MAP) {
-        fx::Map<FUNCTOR_T>(snm_to, op_to_smk);
+        fx::Map<FUNCTOR_T>(snm_to_op, op_to_smk);
     } else if constexpr (OPERATOR_T == FILTER) {
-        fx::Filter<FUNCTOR_T>(snm_to, op_to_smk);
+        fx::Filter<FUNCTOR_T>(snm_to_op, op_to_smk);
     } else if constexpr (OPERATOR_T == FLATMAP) {
-        fx::FlatMap<FUNCTOR_T>(snm_to, op_to_smk);
+        fx::FlatMap<FUNCTOR_T>(snm_to_op, op_to_smk);
     }
 
     if constexpr (OUT_POLICY_T == RR) {
@@ -389,23 +389,23 @@ void ReplicateOperator(
     #pragma HLS dataflow
 
     // TODO: chose the right depth for the streams
-    fx::stream<typename STREAM_IN::data_t, 16> snm_to;
+    fx::stream<typename STREAM_IN::data_t, 16> snm_to_op;
     fx::stream<typename STREAM_OUT::data_t, 16> op_to_smk;
 
     if (IN_POLICY_T == RR) {
-        fx::SNMtoS_RR<N, M>(istrms, snm_to, i, "ReplicateOperator_IN_POLICY_RR");
+        fx::SNMtoS_RR<N, M>(istrms, snm_to_op, i, "ReplicateOperator_IN_POLICY_RR");
     } else if (IN_POLICY_T == LB) {
-        fx::SNMtoS_LB<N, M>(istrms, snm_to, i, "ReplicateOperator_IN_POLICY_LB");
+        fx::SNMtoS_LB<N, M>(istrms, snm_to_op, i, "ReplicateOperator_IN_POLICY_LB");
     } else if (IN_POLICY_T == KB) {
-        fx::SNMtoS_KB<N, M>(istrms, snm_to, i, key_generator, "ReplicateOperator_IN_POLICY_KB");
+        fx::SNMtoS_KB<N, M>(istrms, snm_to_op, i, key_generator, "ReplicateOperator_IN_POLICY_KB");
     }
 
     if (OPERATOR_T == MAP) {
-        fx::Map<FUNCTOR_T>(snm_to, op_to_smk);
+        fx::Map<FUNCTOR_T>(snm_to_op, op_to_smk);
     } else if (OPERATOR_T == FILTER) {
-        fx::Filter<FUNCTOR_T>(snm_to, op_to_smk);
+        fx::Filter<FUNCTOR_T>(snm_to_op, op_to_smk);
     } else if (OPERATOR_T == FLATMAP) {
-        fx::FlatMap<FUNCTOR_T>(snm_to, op_to_smk);
+        fx::FlatMap<FUNCTOR_T>(snm_to_op, op_to_smk);
     }
 
     if (OUT_POLICY_T == RR) {
