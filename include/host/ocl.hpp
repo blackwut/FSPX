@@ -448,12 +448,12 @@ struct OCL
         device = (device_id < 0) ? clPromptDevice(platform) : clSelectDevice(platform, device_id);
         context = clCreateContextFor(platform, device);
 
-        volatile cl_ulong time_start = current_time_ns();
+        auto time_start = high_resolution_time();
         program = clCreateBuildProgramFromBinary(context, device, filename);
-        volatile cl_ulong time_end = current_time_ns();
+        auto time_end = high_resolution_time();
 
         if (show_build_time) {
-            const double time_total = (time_end - time_start) * 1.0e-6;
+            auto time_total = elapsed_time_ms(time_start, time_end);
             std::cout << "INFO: Bitstream loaded in "
                       << COUT_FLOAT << time_total << " ms"
                       << '\n';
@@ -491,8 +491,8 @@ const int hbm_bank[MAX_HBM_PC_COUNT] = {
     HBM_BANK(0),  HBM_BANK(1),  HBM_BANK(2),  HBM_BANK(3),  HBM_BANK(4),  HBM_BANK(5),  HBM_BANK(6),  HBM_BANK(7),
     HBM_BANK(8),  HBM_BANK(9),  HBM_BANK(10), HBM_BANK(11), HBM_BANK(12), HBM_BANK(13), HBM_BANK(14), HBM_BANK(15),
     HBM_BANK(16), HBM_BANK(17), HBM_BANK(18), HBM_BANK(19), HBM_BANK(20), HBM_BANK(21), HBM_BANK(22), HBM_BANK(23),
-    HBM_BANK(24), HBM_BANK(25), HBM_BANK(26), HBM_BANK(27), HBM_BANK(28), HBM_BANK(29), HBM_BANK(30), HBM_BANK(31)};
-
+    HBM_BANK(24), HBM_BANK(25), HBM_BANK(26), HBM_BANK(27), HBM_BANK(28), HBM_BANK(29), HBM_BANK(30), HBM_BANK(31)
+};
 }
 
 #endif // __HOST_OCL__
