@@ -26,7 +26,7 @@ void Filter(
 
     bool last = istrm.read_eos();
 
-    static FUNCTOR_T func(std::forward<Args>(args)...);
+    FUNCTOR_T func(std::forward<Args>(args)...);
 
 Filter:
     while (!last) {

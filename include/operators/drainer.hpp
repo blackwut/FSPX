@@ -24,7 +24,7 @@ struct Drainer
     {
         using T_IN = typename STREAM_IN::data_t;
 
-        static FUNCTOR_T func(std::forward<Args>(args)...);
+        FUNCTOR_T func(std::forward<Args>(args)...);
 
         bool last = istrm.read_eos();
         INDEX_T index = 0;

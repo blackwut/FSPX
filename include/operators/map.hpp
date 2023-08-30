@@ -6,6 +6,7 @@
 #include "../streams/streams.hpp"
 
 // TODO: Args are not used in the A2A connectors
+// TODO: Give an identificator to each operator/functor
 
 namespace fx {
 
@@ -26,7 +27,7 @@ void Map(
 
     bool last = istrm.read_eos();
 
-    static FUNCTOR_T func(std::forward<Args>(args)...);
+    FUNCTOR_T func(std::forward<Args>(args)...);
 
 Map:
     while (!last) {

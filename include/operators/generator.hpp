@@ -24,7 +24,7 @@ struct Generator
     {
         using T_OUT = typename STREAM_OUT::data_t;
 
-        static FUNCTOR_T func(std::forward<Args>(args)...);
+        FUNCTOR_T func(std::forward<Args>(args)...);
 
         bool last = false;
         INDEX_T index = 0;
