@@ -1,8 +1,6 @@
 #ifndef __HOST_UTILS__
 #define __HOST_UTILS__
 
-#if !defined(__SYNTHESIS__)
-
 #include <type_traits>
 #include <limits>
 #include <cstdint>
@@ -80,48 +78,139 @@ const std::string COLOR_LIGHT_MAGENTA = "\033[95m";
 const std::string COLOR_LIGHT_CYAN = "\033[96m";
 const std::string COLOR_LIGHT_WHITE = "\033[97m";
 
-
-ALWAYS_INLINE uint64_t current_time_ns()
+ALWAYS_INLINE std::string formatBytesPerSecond(size_t bytesPerSecond)
 {
-    struct timespec t;
-    clock_gettime(CLOCK_REALTIME, &t);
-    return (t.tv_sec) * uint64_t(1000000000) + t.tv_nsec;
+    static const char * suffixes[] = {"B/s", "KB/s", "MB/s", "GB/s", "TB/s"};
+
+    if (bytesPerSecond == 0) {
+        return "0 B/s";
+    }
+
+    size_t suffixIndex = 0;
+    double speed = static_cast<double>(bytesPerSecond);
+
+    while (speed >= 1024 && suffixIndex < (sizeof(suffixes) / sizeof(suffixes[0])) - 1) {
+        speed /= 1024;
+        ++suffixIndex;
+    }
+
+    std::stringstream stream;
+    stream << COUT_FLOAT_(2) << speed << " " << suffixes[suffixIndex];
+
+    return stream.str();
 }
 
-ALWAYS_INLINE uint64_t current_time_us()
+ALWAYS_INLINE std::string formatTuplesPerSecond(size_t tuplesPerSecond)
 {
-    struct timespec t;
-    clock_gettime(CLOCK_REALTIME, &t);
-    return (t.tv_sec) * uint64_t(1000000) + t.tv_nsec / uint64_t(1000);
+    static const char* suffixes[] = {"t/s", "kt/s", "Mt/s", "Gt/s", "Tt/s"};
+
+    if (tuplesPerSecond == 0) {
+        return "0 t/s";
+    }
+
+    size_t suffixIndex = 0;
+    double speed = static_cast<double>(tuplesPerSecond);
+
+    while (speed >= 1000 && suffixIndex < (sizeof(suffixes) / sizeof(suffixes[0])) - 1) {
+        speed /= 1000;
+        ++suffixIndex;
+    }
+
+    std::stringstream stream;
+    stream << COUT_FLOAT_(2) << speed << " " << suffixes[suffixIndex];
+
+    return stream.str();
 }
 
-ALWAYS_INLINE uint64_t current_time_ms()
+ALWAYS_INLINE std::string colorString(const std::string & text, const std::string& colorCode)
 {
-    struct timespec t;
-    clock_gettime(CLOCK_REALTIME, &t);
-    return (t.tv_sec) * uint64_t(1000) + t.tv_nsec / uint64_t(1000000);
+    return colorCode + text + "\033[0m";
 }
 
-TEMPLATE_INTEGRAL
-ALWAYS_INLINE T time_ns_to_us(const T time) { return time / T(1000); }
+auto high_resolution_time() { return std::chrono::high_resolution_clock::now(); }
+auto elapsed_time_ns(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end) { return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count(); }
+auto elapsed_time_us(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end) { return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count(); }
+auto elapsed_time_ms(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end) { return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(); }
 
-TEMPLATE_INTEGRAL
-ALWAYS_INLINE T time_ns_to_ms(const T time) { return time / T(1000000); }
 
-TEMPLATE_INTEGRAL
-ALWAYS_INLINE T time_ns_to_s(const T time) { return time / T(1000000000); }
+template <typename T>
+void print_performance(
+    std::string name,
+    size_t num_tuples,
+    double time_diff_ns,
+    std::string color = COLOR_WHITE
+)
+{
+    size_t throughput_tps = (num_tuples / time_diff_ns) * 1e9;
+    size_t throughput_bs = (num_tuples * sizeof(T) / time_diff_ns) * 1e9;
 
-// uint32_t max 4294967.296 microseconds
-TEMPLATE_INTEGRAL
-ALWAYS_INLINE T time_us_to_ns(const T time) { return time * T(1000); }
+    std::cout
+        << COUT_HEADER_SMALL << name << ": "
+        << COUT_HEADER_SMALL << "\tTime: "       << COUT_FLOAT_(2) << time_diff_ns / 1e6 << " ms"
+        << COUT_HEADER_SMALL << "\tThroughput: "
+        << colorString(formatTuplesPerSecond(throughput_tps), color)
+        << colorString(formatBytesPerSecond(throughput_bs), color)
+        << '\n';
+}
 
-// uint32_t max 4294.967296 milliseconds
-TEMPLATE_INTEGRAL
-ALWAYS_INLINE T time_ms_to_ns(const T time) { return time * T(1000000); }
+template <typename T>
+void print_performance(
+    std::string name,
+    size_t num_tuples,
+    std::chrono::high_resolution_clock::time_point start,
+    std::chrono::high_resolution_clock::time_point end,
+    std::string color = COLOR_WHITE
+)
+{
+    auto time_diff = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    print_performance<T>(name, num_tuples, time_diff, color);
+}
 
-// uint32_t max 4.294967296 seconds
-TEMPLATE_INTEGRAL
-ALWAYS_INLINE T time_s_to_ns(const T time) { return time * T(1000000000); }
+template <typename T>
+size_t fill_batch_with_dataset(
+    const std::vector<T, aligned_allocator<T>> & dataset,
+    T * batch,
+    const size_t size,
+    const size_t offset = 0
+)
+{
+    size_t total_copied = 0;
+
+    size_t n = size / dataset.size();
+    size_t remaining_elems = size % dataset.size();
+    size_t remaining = dataset.size() - offset;
+
+    T * bufferStart = batch;
+    if (offset > 0 && n > 0) {
+
+        if (remaining > size) {
+            memcpy(bufferStart, dataset.data() + offset, size * sizeof(T));
+            total_copied += size;
+            return size;
+        }
+
+        memcpy(bufferStart, dataset.data() + offset, remaining * sizeof(T));
+        bufferStart += remaining;
+
+        total_copied += remaining;
+
+        n = (size - remaining) / dataset.size();
+        remaining_elems = (size - remaining) % dataset.size();
+    }
+
+    for (size_t i = 0; i < n; i++) {
+        memcpy(bufferStart, dataset.data(), dataset.size() * sizeof(T));
+        bufferStart += dataset.size();
+        total_copied += dataset.size();
+    }
+
+    if (remaining_elems > 0) {
+        memcpy(bufferStart, dataset.data(), remaining_elems * sizeof(T));
+        total_copied += remaining_elems;
+    }
+
+    return total_copied;
+}
 
 TEMPLATE_INTEGRAL
 ALWAYS_INLINE T divide_up(T size, T div)
@@ -199,57 +288,6 @@ ALWAYS_INLINE T next_float(const T from, const T to)
     return dist(gen);
 }
 
-ALWAYS_INLINE std::string formatBytesPerSecond(size_t bytesPerSecond)
-{
-    static const char * suffixes[] = {"B/s", "KB/s", "MB/s", "GB/s", "TB/s"};
-
-    if (bytesPerSecond == 0) {
-        return "0 B/s";
-    }
-
-    size_t suffixIndex = 0;
-    double speed = static_cast<double>(bytesPerSecond);
-
-    while (speed >= 1024 && suffixIndex < (sizeof(suffixes) / sizeof(suffixes[0])) - 1) {
-        speed /= 1024;
-        ++suffixIndex;
-    }
-
-    std::stringstream stream;
-    stream << COUT_FLOAT_(2) << speed << " " << suffixes[suffixIndex];
-
-    return stream.str();
-}
-
-ALWAYS_INLINE std::string formatTuplesPerSecond(size_t tuplesPerSecond)
-{
-    static const char* suffixes[] = {"t/s", "kt/s", "Mt/s", "Gt/s", "Tt/s"};
-
-    if (tuplesPerSecond == 0) {
-        return "0 t/s";
-    }
-
-    size_t suffixIndex = 0;
-    double speed = static_cast<double>(tuplesPerSecond);
-
-    while (speed >= 1000 && suffixIndex < (sizeof(suffixes) / sizeof(suffixes[0])) - 1) {
-        speed /= 1000;
-        ++suffixIndex;
-    }
-
-    std::stringstream stream;
-    stream << COUT_FLOAT_(2) << speed << " " << suffixes[suffixIndex];
-
-    return stream.str();
-}
-
-ALWAYS_INLINE std::string colorString(const std::string & text, const std::string& colorCode)
-{
-    return colorCode + text + "\033[0m";
-}
-
-}
-
-#endif // !defined(__SYNTHESIS__)
+} // namespace fx
 
 #endif // __HOST_UTILS__
