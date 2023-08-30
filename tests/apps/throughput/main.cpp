@@ -128,8 +128,6 @@ void mr_thread(
 
     pthread_barrier_wait(&barrier);
 
-    // std::this_thread::sleep_for(std::chrono::milliseconds(5 * idx));
-
     const auto time_start = get_time();
     for (size_t it = 0; it < iterations; ++it) {
         record_t * batch = mr.get_batch();
