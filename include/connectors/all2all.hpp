@@ -51,8 +51,8 @@ template <
     typename KEY_EXTRACTOR_T = int
 >
 void Emitter(
-    STREAM_IN istrms[N],
-    STREAM_OUT ostrms[N][M],
+    STREAM_IN (&istrms)[N],
+    STREAM_OUT (&ostrms)[N][M],
     KEY_EXTRACTOR_T && key_extractor = 0
 )
 {
@@ -76,7 +76,7 @@ Emitter:
         } else if constexpr (POLICY_T == LB) {
             fx::StoSN_LB<M>(istrms[i], ostrms[i], "Emitter_LB");
         } else if constexpr (POLICY_T == KB) {
-            fx::StoSN_KB<M>(istrms[i], ostrms[i], key_extractor, "Emitter_KB");
+            fx::StoSN_KB<M>(istrms[i], ostrms[i], std::forward<KEY_EXTRACTOR_T>(key_extractor), "Emitter_KB");
         } else if constexpr (POLICY_T == BR) {
             fx::StoSN_BR<M>(istrms[i], ostrms[i], "Emitter_BR");
         }
@@ -104,8 +104,8 @@ template <
     typename KEY_GENERATOR_T = int
 >
 void ReplicateOperator(
-    STREAM_IN istrms[N][M],
-    STREAM_OUT ostrms[K],
+    STREAM_IN (&istrms)[N][M],
+    STREAM_OUT (&ostrms)[K],
     int i,
     KEY_EXTRACTOR_T && key_extractor = 0,
     KEY_GENERATOR_T && key_generator = 0
@@ -150,7 +150,7 @@ void ReplicateOperator(
     } else if constexpr (IN_POLICY_T == LB) {
         fx::SNMtoS_LB<N, M>(istrms, snm_to_op, i, "ReplicateOperator_IN_POLICY_LB");
     } else if constexpr (IN_POLICY_T == KB) {
-        fx::SNMtoS_KB<N, M>(istrms, snm_to_op, i, key_generator, "ReplicateOperator_IN_POLICY_KB");
+        fx::SNMtoS_KB<N, M>(istrms, snm_to_op, i, std::forward<KEY_GENERATOR_T>(key_generator), "ReplicateOperator_IN_POLICY_KB");
     }
 
     if constexpr (OPERATOR_T == MAP) {
@@ -166,7 +166,7 @@ void ReplicateOperator(
     } else if constexpr (OUT_POLICY_T == LB) {
         fx::StoSN_LB<K>(op_to_smk, ostrms, "ReplicateOperator_OUT_POLICY_LB");
     } else if constexpr (OUT_POLICY_T == KB) {
-        fx::StoSN_KB<K>(op_to_smk, ostrms, key_extractor, "ReplicateOperator_OUT_POLICY_KB");
+        fx::StoSN_KB<K>(op_to_smk, ostrms, std::forward<KEY_EXTRACTOR_T>(key_extractor), "ReplicateOperator_OUT_POLICY_KB");
     } else if constexpr (OUT_POLICY_T == BR) {
         fx::StoSN_BR<K>(op_to_smk, ostrms, "ReplicateOperator_OUT_POLICY_BR");
     }
@@ -186,8 +186,8 @@ template <
     typename KEY_GENERATOR_T = int
 >
 void Operator(
-    STREAM_IN istrms[N][M],
-    STREAM_OUT ostrms[M][K],
+    STREAM_IN (&istrms)[N][M],
+    STREAM_OUT (&ostrms)[M][K],
     KEY_EXTRACTOR_T && key_extractor = 0,
     KEY_GENERATOR_T && key_generator = 0
 )
@@ -246,8 +246,8 @@ template <
     typename KEY_GENERATOR_T = int
 >
 void Collector(
-    STREAM_IN istrms[N][M],
-    STREAM_OUT ostrms[M],
+    STREAM_IN (&istrms)[N][M],
+    STREAM_OUT (&ostrms)[M],
     KEY_GENERATOR_T && key_generator = 0
 )
 {
@@ -269,7 +269,7 @@ Collector:
         } else if constexpr (POLICY_T == LB) {
             fx::SNMtoS_LB<N, M>(istrms, ostrms[i], i, "Collector_LB");
         } else if constexpr (POLICY_T == KB) {
-            fx::SNMtoS_KB<N, M>(istrms, ostrms[i], i, key_generator, "Collector_KB");
+            fx::SNMtoS_KB<N, M>(istrms, ostrms[i], i, std::forward<KEY_GENERATOR_T>(key_generator), "Collector_KB");
         }
     }
 }
@@ -298,8 +298,8 @@ template <
     typename KEY_EXTRACTOR_T = decltype(default_key_extractor_t<typename STREAM_IN::data_t>)
 >
 void Emitter(
-    STREAM_IN istrms[N],
-    STREAM_OUT ostrms[N][M],
+    STREAM_IN (&istrms)[N],
+    STREAM_OUT (&ostrms)[N][M],
     KEY_EXTRACTOR_T & key_extractor = default_key_extractor_t<typename STREAM_IN::data_t>
 )
 {
@@ -323,7 +323,7 @@ Emitter:
         } else if (POLICY_T == LB) {
             fx::StoSN_LB<M>(istrms[i], ostrms[i], "Emitter_LB");
         } else if (POLICY_T == KB) {
-            fx::StoSN_KB<M>(istrms[i], ostrms[i], key_extractor, "Emitter_KB");
+            fx::StoSN_KB<M>(istrms[i], ostrms[i], std::forward<KEY_EXTRACTOR_T>(key_extractor), "Emitter_KB");
         } else if (POLICY_T == BR) {
             fx::StoSN_BR<M>(istrms[i], ostrms[i], "Emitter_BR");
         }
@@ -351,8 +351,8 @@ template <
     typename KEY_GENERATOR_T = decltype(default_key_generator_t)
 >
 void ReplicateOperator(
-    STREAM_IN istrms[N][M],
-    STREAM_OUT ostrms[K],
+    STREAM_IN (&istrms)[N][M],
+    STREAM_OUT (&ostrms)[K],
     int i,
     KEY_EXTRACTOR_T & key_extractor = default_key_extractor_t<typename STREAM_IN::data_t>,
     KEY_GENERATOR_T & key_generator = default_key_generator_t
@@ -397,7 +397,7 @@ void ReplicateOperator(
     } else if (IN_POLICY_T == LB) {
         fx::SNMtoS_LB<N, M>(istrms, snm_to_op, i, "ReplicateOperator_IN_POLICY_LB");
     } else if (IN_POLICY_T == KB) {
-        fx::SNMtoS_KB<N, M>(istrms, snm_to_op, i, key_generator, "ReplicateOperator_IN_POLICY_KB");
+        fx::SNMtoS_KB<N, M>(istrms, snm_to_op, i, std::forward<KEY_GENERATOR_T>(key_generator), "ReplicateOperator_IN_POLICY_KB");
     }
 
     if (OPERATOR_T == MAP) {
@@ -413,7 +413,7 @@ void ReplicateOperator(
     } else if (OUT_POLICY_T == LB) {
         fx::StoSN_LB<K>(op_to_smk, ostrms, "ReplicateOperator_OUT_POLICY_LB");
     } else if (OUT_POLICY_T == KB) {
-        fx::StoSN_KB<K>(op_to_smk, ostrms, key_extractor, "ReplicateOperator_OUT_POLICY_KB");
+        fx::StoSN_KB<K>(op_to_smk, ostrms, std::forward<KEY_EXTRACTOR_T>(key_extractor), "ReplicateOperator_OUT_POLICY_KB");
     } else if (OUT_POLICY_T == BR) {
         fx::StoSN_BR<K>(op_to_smk, ostrms, "ReplicateOperator_OUT_POLICY_BR");
     }
@@ -433,8 +433,8 @@ template <
     typename KEY_GENERATOR_T = decltype(default_key_generator_t)
 >
 void Operator(
-    STREAM_IN istrms[N][M],
-    STREAM_OUT ostrms[M][K],
+    STREAM_IN (&istrms)[N][M],
+    STREAM_OUT (&ostrms)[M][K],
     KEY_EXTRACTOR_T & key_extractor = default_key_extractor_t<typename STREAM_IN::data_t>,
     KEY_GENERATOR_T & key_generator = default_key_generator_t
 )
@@ -472,7 +472,7 @@ A2AOperator:
     for (int i = 0; i < M; ++i) {
     #pragma HLS unroll
         ReplicateOperator<OPERATOR_T, FUNCTOR_T, IN_POLICY_T, OUT_POLICY_T, N, M, K>(
-            istrms, ostrms[i], i, key_extractor, key_generator
+            istrms, ostrms[i], i, std::forward<KEY_EXTRACTOR_T>(key_extractor), std::forward<KEY_GENERATOR_T>(key_generator)
         );
     }
 }
@@ -493,8 +493,8 @@ template <
     typename KEY_GENERATOR_T = decltype(default_key_generator_t)
 >
 void Collector(
-    STREAM_IN istrms[N][M],
-    STREAM_OUT ostrms[M],
+    STREAM_IN (&istrms)[N][M],
+    STREAM_OUT (&ostrms)[M],
     KEY_GENERATOR_T & key_generator = default_key_generator_t
 )
 {
@@ -516,7 +516,7 @@ Collector:
         } else if (POLICY_T == LB) {
             fx::SNMtoS_LB<N, M>(istrms, ostrms[i], i, "Collector_LB");
         } else if (POLICY_T == KB) {
-            fx::SNMtoS_KB<N, M>(istrms, ostrms[i], i, key_generator, "Collector_KB");
+            fx::SNMtoS_KB<N, M>(istrms, ostrms[i], i, std::forward<KEY_GENERATOR_T>(key_generator), "Collector_KB");
         }
     }
 }
@@ -537,7 +537,7 @@ template <
     typename STREAM_OUT
 >
 void ReplicateGenerator(
-    STREAM_OUT ostrms[N]
+    STREAM_OUT (&ostrms)[N]
 )
 {
 #pragma HLS dataflow
@@ -562,7 +562,7 @@ template <
     typename STREAM_IN
 >
 void ReplicateDrainer(
-    STREAM_IN istrms[N]
+    STREAM_IN (&istrms)[N]
 )
 {
 #pragma HLS dataflow
