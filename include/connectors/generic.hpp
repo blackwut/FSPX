@@ -55,7 +55,7 @@ template <
 >
 void StoSN_RR(
     STREAM_IN & istrm,
-    STREAM_OUT ostrms[N],
+    STREAM_OUT (&ostrms)[N],
     const char * name = ""
 )
 {
@@ -96,7 +96,7 @@ template <
     typename STREAM_OUT
 >
 void SNtoS_RR(
-    STREAM_IN istrms[N],
+    STREAM_IN (&istrms)[N],
     STREAM_OUT & ostrm,
     const char * name = ""
 )
@@ -129,14 +129,9 @@ SNtoS_RR:
             #endif
 
             ostrm.write(t);
-
-            id = (id + 1 == N) ? 0 : (id + 1);
         }
-        // TODO: this should be correct but in the following link the implementation is different
-        // https://github.com/Xilinx/Vitis_Libraries/blob/2022.2/utils/L1/include/xf_utils_hw/stream_n_to_one/round_robin.hpp#L321
-        //
-        // Explaination: in the linked code the following line is inside the if statement
-        // id = (id + 1 == N) ? 0 : (id + 1);
+
+        id = (id + 1 == N) ? 0 : (id + 1);
     }
 
     ostrm.write_eos();
@@ -149,7 +144,7 @@ template <
     typename STREAM_OUT
 >
 void SNMtoS_RR(
-    STREAM_IN istrms[N][M],
+    STREAM_IN (&istrms)[N][M],
     STREAM_OUT & ostrm,
     int m,
     const char * name = ""
@@ -184,13 +179,8 @@ SNMtoS_RR:
             #endif
 
             ostrm.write(t);
-
-            // id = (id + 1 == N) ? 0 : (id + 1);
         }
-        // TODO: this should be correct but in the following link the implementation is different
-        // https://github.com/Xilinx/Vitis_Libraries/blob/2022.2/utils/L1/include/xf_utils_hw/stream_n_to_one/round_robin.hpp#L321
-        //
-        // Explaination: in the linked code the following line is inside the if statement
+
         id = (id + 1 == N) ? 0 : (id + 1);
     }
 
@@ -211,7 +201,7 @@ template <
 >
 void StoSN_LB(
     STREAM_IN & istrm,
-    STREAM_OUT ostrms[N],
+    STREAM_OUT (&ostrms)[N],
     const char * name = ""
 )
 {
@@ -247,64 +237,13 @@ StoSN_LB_EOS:
     }
 }
 
-#if 0
 template <
     int N,
     typename STREAM_IN,
     typename STREAM_OUT
 >
 void SNtoS_LB(
-    STREAM_IN istrms[N],
-    STREAM_OUT & ostrm,
-    const char * name = ""
-)
-{
-    UNUSED(name);
-    using T = typename STREAM_IN::data_t;
-
-    int id = 0;
-    ap_uint<N> lasts = 0;
-    const ap_uint<N> ends = ~lasts;   // set all bits to one
-
-    for (int i = 0; i < N; ++i) {
-    #pragma HLS UNROLL
-        lasts[i] = istrms[i].read_eos();
-    }
-
-SNtoS_LoadBalancer:
-    while (lasts != ends) {
-    #pragma HLS PIPELINE II = 1
-    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-
-        bool last = lasts[id];
-        bool empty = istrms[id].empty();
-
-        if (!last && !empty) {
-            T t = istrms[id].read();
-            lasts[id] = istrms[id].read_eos();
-
-            #if defined(__DEBUG__CONNECTORS__)
-            std::stringstream ss;
-            ss << "SNtoS_LB" << " (from: " << id << ", last: " << lasts[id] << ")";
-            print_debug(ss.str(), name, t);
-            #endif
-
-            ostrm.write(t);
-        }
-
-        id = (id + 1 == N) ? 0 : (id + 1);
-    }
-
-    ostrm.write_eos();
-}
-#else
-template <
-    int N,
-    typename STREAM_IN,
-    typename STREAM_OUT
->
-void SNtoS_LB(
-    STREAM_IN istrms[N],
+    STREAM_IN (&istrms)[N],
     STREAM_OUT & ostrm,
     const char * name = ""
 )
@@ -350,7 +289,6 @@ SNtoS_LB:
 
     ostrm.write_eos();
 }
-#endif
 
 template <
     int N,
@@ -360,7 +298,7 @@ template <
 >
 void StoSNM_LB(
     STREAM_IN & istrm,
-    STREAM_OUT ostrms[N][M],
+    STREAM_OUT (&ostrms)[N][M],
     int n,
     const char * name = ""
 )
@@ -397,7 +335,6 @@ StoSNM_LB_EOS:
     }
 }
 
-#if 0
 template <
     int N,
     int M,
@@ -405,60 +342,7 @@ template <
     typename STREAM_OUT
 >
 void SNMtoS_LB(
-    STREAM_IN istrms[N][M],
-    STREAM_OUT & ostrm,
-    int m,
-    const char * name = ""
-)
-{
-    UNUSED(name);
-    using T = typename STREAM_IN::data_t;
-
-    int id = 0;
-    ap_uint<N> lasts = 0;
-    const ap_uint<N> ends = ~lasts;   // set all bits to one
-
-SNMtoS_LoadBalancer_Init:
-    for (int i = 0; i < N; ++i) {
-    #pragma HLS UNROLL
-        lasts[i] = istrms[i][m].read_eos();
-    }
-
-SNMtoS_LoadBalancer:
-    while (lasts != ends) {
-    #pragma HLS PIPELINE II = 1
-    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-
-        bool last = lasts[id];
-        bool empty = istrms[id][m].empty();
-
-        if (!last && !empty) {
-            T t = istrms[id][m].read();
-            lasts[id] = istrms[id][m].read_eos();
-
-            #if defined(__DEBUG__CONNECTORS__)
-            std::stringstream ss;
-            ss << "SNMtoS_LB" << " (from: " << id << ", last: " << lasts[id] << ")";
-            print_debug(ss.str(), name, t);
-            #endif
-
-            ostrm.write(t);
-        }
-
-        id = (id + 1 == N) ? 0 : (id + 1);
-    }
-
-    ostrm.write_eos();
-}
-#else
-template <
-    int N,
-    int M,
-    typename STREAM_IN,
-    typename STREAM_OUT
->
-void SNMtoS_LB(
-    STREAM_IN istrms[N][M],
+    STREAM_IN (&istrms)[N][M],
     STREAM_OUT & ostrm,
     int m,
     const char * name = ""
@@ -505,7 +389,7 @@ SNMtoS_LB:
 
     ostrm.write_eos();
 }
-#endif
+
 
 //******************************************************************************
 //
@@ -521,7 +405,7 @@ template <
 >
 void StoSN_KB(
     STREAM_IN & istrm,
-    STREAM_OUT ostrms[N],
+    STREAM_OUT (&ostrms)[N],
     KEY_EXTRACTOR_T && key_extractor,
     const char * name = ""
 )
@@ -537,8 +421,7 @@ StoSN_KB:
     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
         T t = istrm.read();
         last = istrm.read_eos();
-
-        int key = key_extractor(t);
+        int key = key_extractor(t) % N;
         ostrms[key].write(t);
 
         #if defined(__DEBUG__CONNECTORS__)
@@ -562,7 +445,7 @@ template <
     typename KEY_GENERATOR_T
 >
 void SNtoS_KB(
-    STREAM_IN istrms[N],
+    STREAM_IN (&istrms)[N],
     STREAM_OUT & ostrm,
     int m,
     KEY_GENERATOR_T && key_generator,
@@ -617,7 +500,7 @@ template <
     typename KEY_GENERATOR_T
 >
 void SNMtoS_KB(
-    STREAM_IN istrms[N][M],
+    STREAM_IN (&istrms)[N][M],
     STREAM_OUT & ostrm,
     int m,
     KEY_GENERATOR_T && key_generator,
@@ -677,7 +560,7 @@ template <
 >
 void StoSN_BR(
     STREAM_IN & istrm,
-    STREAM_OUT ostrms[N],
+    STREAM_OUT (&ostrms)[N],
     const char * name = ""
 )
 {
