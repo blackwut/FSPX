@@ -10,6 +10,7 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+#include <chrono>
 
 #define ALLOC_ALIGNMENT 4096
 
@@ -132,6 +133,19 @@ auto elapsed_time_ns(std::chrono::high_resolution_clock::time_point start, std::
 auto elapsed_time_us(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end) { return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count(); }
 auto elapsed_time_ms(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end) { return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(); }
 
+ALWAYS_INLINE uint64_t current_time_nsecs()
+{
+    struct timespec t;
+    clock_gettime(CLOCK_REALTIME, &t);
+    return (t.tv_sec)*1000000000L + t.tv_nsec;
+}
+
+ALWAYS_INLINE uint64_t current_time_usecs()
+{
+    struct timespec t;
+    clock_gettime(CLOCK_REALTIME, &t);
+    return (t.tv_sec) * 1000000L + t.tv_nsec;
+}
 
 template <typename T>
 void print_performance(
