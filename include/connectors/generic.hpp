@@ -55,7 +55,7 @@ template <
 >
 void StoSN_RR(
     STREAM_IN & istrm,
-    STREAM_OUT (&ostrms)[N],
+    STREAM_OUT ostrms[N],
     const char * name = ""
 )
 {
@@ -96,7 +96,7 @@ template <
     typename STREAM_OUT
 >
 void SNtoS_RR(
-    STREAM_IN (&istrms)[N],
+    STREAM_IN istrms[N],
     STREAM_OUT & ostrm,
     const char * name = ""
 )
@@ -144,7 +144,7 @@ template <
     typename STREAM_OUT
 >
 void SNMtoS_RR(
-    STREAM_IN (&istrms)[N][M],
+    STREAM_IN istrms[N][M],
     STREAM_OUT & ostrm,
     int m,
     const char * name = ""
@@ -201,7 +201,7 @@ template <
 >
 void StoSN_LB(
     STREAM_IN & istrm,
-    STREAM_OUT (&ostrms)[N],
+    STREAM_OUT ostrms[N],
     const char * name = ""
 )
 {
@@ -243,7 +243,7 @@ template <
     typename STREAM_OUT
 >
 void SNtoS_LB(
-    STREAM_IN (&istrms)[N],
+    STREAM_IN istrms[N],
     STREAM_OUT & ostrm,
     const char * name = ""
 )
@@ -298,7 +298,7 @@ template <
 >
 void StoSNM_LB(
     STREAM_IN & istrm,
-    STREAM_OUT (&ostrms)[N][M],
+    STREAM_OUT ostrms[N][M],
     int n,
     const char * name = ""
 )
@@ -342,7 +342,7 @@ template <
     typename STREAM_OUT
 >
 void SNMtoS_LB(
-    STREAM_IN (&istrms)[N][M],
+    STREAM_IN istrms[N][M],
     STREAM_OUT & ostrm,
     int m,
     const char * name = ""
@@ -405,7 +405,7 @@ template <
 >
 void StoSN_KB(
     STREAM_IN & istrm,
-    STREAM_OUT (&ostrms)[N],
+    STREAM_OUT ostrms[N],
     KEY_EXTRACTOR_T && key_extractor,
     const char * name = ""
 )
@@ -445,7 +445,7 @@ template <
     typename KEY_GENERATOR_T
 >
 void SNtoS_KB(
-    STREAM_IN (&istrms)[N],
+    STREAM_IN istrms[N],
     STREAM_OUT & ostrm,
     int m,
     KEY_GENERATOR_T && key_generator,
@@ -500,7 +500,7 @@ template <
     typename KEY_GENERATOR_T
 >
 void SNMtoS_KB(
-    STREAM_IN (&istrms)[N][M],
+    STREAM_IN istrms[N][M],
     STREAM_OUT & ostrm,
     int m,
     KEY_GENERATOR_T && key_generator,
@@ -560,7 +560,7 @@ template <
 >
 void StoSN_BR(
     STREAM_IN & istrm,
-    STREAM_OUT (&ostrms)[N],
+    STREAM_OUT ostrms[N],
     const char * name = ""
 )
 {

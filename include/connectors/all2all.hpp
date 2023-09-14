@@ -51,8 +51,8 @@ template <
     typename KEY_EXTRACTOR_T = int
 >
 void Emitter(
-    STREAM_IN (&istrms)[N],
-    STREAM_OUT (&ostrms)[N][M],
+    STREAM_IN istrms[N],
+    STREAM_OUT ostrms[N][M],
     KEY_EXTRACTOR_T && key_extractor = 0
 )
 {
@@ -104,8 +104,8 @@ template <
     typename KEY_GENERATOR_T = int
 >
 void ReplicateOperator(
-    STREAM_IN (&istrms)[N][M],
-    STREAM_OUT (&ostrms)[K],
+    STREAM_IN istrms[N][M],
+    STREAM_OUT ostrms[K],
     int i,
     KEY_EXTRACTOR_T && key_extractor = 0,
     KEY_GENERATOR_T && key_generator = 0
@@ -186,8 +186,8 @@ template <
     typename KEY_GENERATOR_T = int
 >
 void Operator(
-    STREAM_IN (&istrms)[N][M],
-    STREAM_OUT (&ostrms)[M][K],
+    STREAM_IN istrms[N][M],
+    STREAM_OUT ostrms[M][K],
     KEY_EXTRACTOR_T && key_extractor = 0,
     KEY_GENERATOR_T && key_generator = 0
 )
@@ -246,8 +246,8 @@ template <
     typename KEY_GENERATOR_T = int
 >
 void Collector(
-    STREAM_IN (&istrms)[N][M],
-    STREAM_OUT (&ostrms)[M],
+    STREAM_IN istrms[N][M],
+    STREAM_OUT ostrms[M],
     KEY_GENERATOR_T && key_generator = 0
 )
 {
@@ -537,7 +537,7 @@ template <
     typename STREAM_OUT
 >
 void ReplicateGenerator(
-    STREAM_OUT (&ostrms)[N]
+    STREAM_OUT ostrms[N]
 )
 {
 #pragma HLS dataflow
@@ -562,7 +562,7 @@ template <
     typename STREAM_IN
 >
 void ReplicateDrainer(
-    STREAM_IN (&istrms)[N]
+    STREAM_IN istrms[N]
 )
 {
 #pragma HLS dataflow
