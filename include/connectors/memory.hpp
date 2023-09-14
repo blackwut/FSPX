@@ -430,53 +430,53 @@ WMtoS:
 //
 //******************************************************************************
 
-template <int W, int BURST_LENGTH = 4096 / (W / 8), typename STREAM_IN>
-void prepare_burst_wide(
-    STREAM_IN & in,
-    hls::stream< ap_uint<W> > & out,
-    hls::stream< ap_uint<8> > & burst_size,
-    hls::stream<bool> & eos_signal,
-    int out_size
-)
-{
-    HW_STATIC_ASSERT((W >= 8) && (W <= 512) && IS_POW2(W),
-                     "AXI port width W must be power of 2 and between 8 to 512.");
+// template <int W, int BURST_LENGTH = 4096 / (W / 8), typename STREAM_IN>
+// void prepare_burst_wide(
+//     STREAM_IN & in,
+//     hls::stream< ap_uint<W> > & out,
+//     hls::stream< ap_uint<8> > & burst_size,
+//     hls::stream<bool> & eos_signal,
+//     int out_size
+// )
+// {
+//     HW_STATIC_ASSERT((W >= 8) && (W <= 512) && IS_POW2(W),
+//                      "AXI port width W must be power of 2 and between 8 to 512.");
 
-    const int WRITE_MAX_COUNT = out_size / (W / 8); // max number of write operations
+//     const int WRITE_MAX_COUNT = out_size / (W / 8); // max number of write operations
 
-    int wc = 0;   // count the total number of write operations
-    int bc = 0;   // count the number of write operations in a single burst
+//     int wc = 0;   // count the total number of write operations
+//     int bc = 0;   // count the number of write operations in a single burst
 
-    bool last = in.read_eos();
-prepare_burst_wide:
-    while (!last && (wc < WRITE_MAX_COUNT)) {
-    #pragma HLS PIPELINE II = 1
-    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-        ap_uint<W> line = in.read();
-        last = in.read_eos();
+//     bool last = in.read_eos();
+// prepare_burst_wide:
+//     while (!last && (wc < WRITE_MAX_COUNT)) {
+//     #pragma HLS PIPELINE II = 1
+//     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+//         ap_uint<W> line = in.read();
+//         last = in.read_eos();
 
-        out.write(line);
-        wc = wc + 1;
+//         out.write(line);
+//         wc = wc + 1;
 
-        if (bc + 1 == BURST_LENGTH) {
-            // signal a complete burst
-            burst_size.write(BURST_LENGTH);
-            bc = 0;
-        } else {
-            bc = bc + 1;
-        }
-    }
+//         if (bc + 1 == BURST_LENGTH) {
+//             // signal a complete burst
+//             burst_size.write(BURST_LENGTH);
+//             bc = 0;
+//         } else {
+//             bc = bc + 1;
+//         }
+//     }
 
-    // last burst or partial burst
-    if (bc != 0) {
-        burst_size.write(bc);
-    }
-    // no more writes
-    burst_size.write(0);
+//     // last burst or partial burst
+//     if (bc != 0) {
+//         burst_size.write(bc);
+//     }
+//     // no more writes
+//     burst_size.write(0);
 
-    // propagate EOS
-    eos_signal.write(last);
-}
+//     // propagate EOS
+//     eos_signal.write(last);
+// }
 
 // Possible variant: even if the stream is ended, complete the bust with empty
 // data. This could lead to waste less resources but increase latency for results
@@ -485,6 +485,7 @@ void prepare_burst(
     STREAM_IN & in,
     hls::stream< ap_uint<W> > & out,
     hls::stream< ap_uint<8> > & burst_size,
+    hls::stream< ap_uint<16> > & items_packed,
     hls::stream<bool> & eos_signal,
     int out_size
 )
@@ -529,6 +530,7 @@ prepare_burst:
             // signal a complete burst
             if (bc + 1 == BURST_LENGTH) {
                 burst_size.write(BURST_LENGTH);
+                items_pack.write(BURST_LENGTH * TMP_ITEMS);
                 bc = 0;
             } else {
                 bc = bc + 1;
@@ -554,9 +556,11 @@ prepare_burst:
     // last burst or partial burst
     if (bc != 0) {
         burst_size.write(bc);
+        items_pack.write(bc * TMP_ITEMS + i);
     }
     // no more writes
     burst_size.write(0);
+    items_pack.write(0);
 
     // propagate EOS
     eos_signal.write(last);
@@ -566,9 +570,10 @@ template <int W, int BURST_LENGTH = 4096 / (W / 8)>
 void burst_write(
     hls::stream< ap_uint<W> > & in,
     hls::stream< ap_uint<8> > & burst_size,
+    hls::stream< ap_uint<16> > & items_packed,
     hls::stream<bool> & eos_signal,
     ap_uint<W> * out,
-    int * write_count,
+    int * items_written,
     int * eos
 )
 {
@@ -576,7 +581,7 @@ void burst_write(
                      "AXI port width W must be power of 2 and between 8 to 512.");
     int i = 0;
     int bs = burst_size.read();
-    int wc = bs;
+    int iw = items_packed.read();
 
 burst_write:
     while (bs) {
@@ -588,59 +593,61 @@ burst_write:
         }
         i++;
         bs = burst_size.read();
-        wc += bs;
+        iw += items_packed.read();
     }
 
-    write_count[0] = wc;
+    items_written[0] = iw;
     eos[0] = (eos_signal.read() ? 1 : 0);
 }
 
-template <int W, int BURST_LENGTH = 4096 / (W / 8), typename STREAM_IN>
-void WStoWM(
-    STREAM_IN & in,
-    ap_uint<W> * out,
-    int out_size,
-    int * write_count,
-    int * eos
-)
-{
-#pragma HLS DATAFLOW
-    hls::stream< ap_uint<W> > internal_stream;
-    hls::stream< ap_uint<8> > burst_size;
-    hls::stream<bool> eos_signal;
+// template <int W, int BURST_LENGTH = 4096 / (W / 8), typename STREAM_IN>
+// void WStoWM(
+//     STREAM_IN & in,
+//     ap_uint<W> * out,
+//     int out_size,
+//     int * write_count,
+//     int * eos
+// )
+// {
+// #pragma HLS DATAFLOW
+//     hls::stream< ap_uint<W> > internal_stream;
+//     hls::stream< ap_uint<8> > burst_size;
+//     hls::stream<bool> eos_signal;
 
-    constexpr int fifo_buf = 2 * BURST_LENGTH;
+//     constexpr int fifo_buf = 2 * BURST_LENGTH;
 
-    #pragma HLS STREAM variable = internal_stream depth = fifo_buf
-    #pragma HLS STREAM variable = burst_size depth = 2
-    #pragma HLS STREAM variable = eos_signal depth = 2
+//     #pragma HLS STREAM variable = internal_stream depth = fifo_buf
+//     #pragma HLS STREAM variable = burst_size depth = 2
+//     #pragma HLS STREAM variable = eos_signal depth = 2
 
-    prepare_burst_wide(in, internal_stream, burst_size, eos_signal, out_size);
-    burst_write(internal_stream, burst_size, eos_signal, out, write_count, eos);
-}
+//     prepare_burst_wide(in, internal_stream, burst_size, eos_signal, out_size);
+//     burst_write(internal_stream, burst_size, eos_signal, out, write_count, eos);
+// }
 
 template <int W, int BURST_LENGTH = 4096 / (W / 8), typename STREAM_IN>
 void StoWM(
     STREAM_IN & in,
     ap_uint<W> * out,
     int out_size,
-    int * write_count,
+    int * items_written,
     int * eos
 )
 {
 #pragma HLS DATAFLOW
     hls::stream< ap_uint<W> > internal_stream;
     hls::stream< ap_uint<8> > burst_size;
+    hls::stream< ap_uint<16> > items_packed;
     hls::stream<bool> eos_signal;
 
     constexpr int fifo_buf = 2 * BURST_LENGTH;
 
     #pragma HLS STREAM variable = internal_stream depth = fifo_buf
     #pragma HLS STREAM variable = burst_size depth = 2
+    #pragma HLS STREAM variable = items_packed depth = 2
     #pragma HLS STREAM variable = eos_signal depth = 2
 
-    prepare_burst(in, internal_stream, burst_size, eos_signal, out_size);
-    burst_write(internal_stream, burst_size, eos_signal, out, write_count, eos);
+    prepare_burst(in, internal_stream, burst_size, items_packed, eos_signal, out_size);
+    burst_write(internal_stream, burst_size, items_packed, eos_signal, out, items_written, eos);
 }
 
 
