@@ -1,5 +1,5 @@
-#ifndef __MEMORY_READER__
-#define __MEMORY_READER__
+#ifndef __STREAM_GENERATOR__
+#define __STREAM_GENERATOR__
 
 #include <vector>
 #include <deque>
@@ -15,7 +15,7 @@ namespace fx {
 #if MEMORY_MAP
 
 template <typename T>
-struct MemoryReaderExecution
+struct StreamGeneratorExecution
 {
     OCL & ocl;
     size_t max_batch_size;
@@ -35,7 +35,7 @@ struct MemoryReaderExecution
     const int count_argi = 1;
     const int eos_argi = 2;
 
-    MemoryReaderExecution(
+    StreamGeneratorExecution(
         OCL & ocl,
         const size_t batch_size,
         const size_t replica_id = 0
@@ -56,7 +56,7 @@ struct MemoryReaderExecution
             max_batch_size * sizeof(T), nullptr,
             &err
         );
-        clCheckErrorMsg(err, "fx::MemoryReader: failed to create device buffer (batch_d)");
+        clCheckErrorMsg(err, "fx::StreamGenerator: failed to create device buffer (batch_d)");
 
         clCheckError(clSetKernelArg(kernel, batch_argi, sizeof(batch_d), &batch_d));
     }
@@ -68,7 +68,7 @@ struct MemoryReaderExecution
     {
         if (batch_size > max_batch_size) {
             std::cerr
-                << "fx::MemoryReader: batch_size is larger than max_batch_size!"
+                << "fx::StreamGenerator: batch_size is larger than max_batch_size!"
                 << "Only " << max_batch_size << " elements are processed."
                 << '\n';
 
@@ -102,7 +102,7 @@ struct MemoryReaderExecution
             0, nullptr, &map_event,
             &err
         ));
-        clCheckErrorMsg(err, "fx::MemoryReader: failed to map device buffer (batch_d)");
+        clCheckErrorMsg(err, "fx::StreamGenerator: failed to map device buffer (batch_d)");
 
         clCheckError(clWaitForEvents(1, &map_event));
         clCheckError(clReleaseEvent(map_event));
@@ -116,7 +116,7 @@ struct MemoryReaderExecution
         clCheckError(clReleaseEvent(unmap_event));
     }
 
-    ~MemoryReaderExecution()
+    ~StreamGeneratorExecution()
     {
         clCheckError(clReleaseMemObject(batch_d));
         clCheckError(clReleaseKernel(kernel));
@@ -128,7 +128,7 @@ struct MemoryReaderExecution
 #else
 
 template <typename T>
-struct MemoryReaderExecution
+struct StreamGeneratorExecution
 {
     OCL & ocl;
     size_t max_batch_size;
@@ -147,7 +147,7 @@ struct MemoryReaderExecution
     const int count_argi = 1;
     const int eos_argi = 2;
 
-    MemoryReaderExecution(
+    StreamGeneratorExecution(
         OCL & ocl,
         const size_t batch_size,
         const size_t replica_id = 0
@@ -168,7 +168,7 @@ struct MemoryReaderExecution
             max_batch_size * sizeof(T), batch_h,
             &err
         );
-        clCheckErrorMsg(err, "fx::MemoryReader: failed to create device buffer (batch_d)");
+        clCheckErrorMsg(err, "fx::StreamGenerator: failed to create device buffer (batch_d)");
 
         clCheckError(clSetKernelArg(kernel, batch_argi, sizeof(batch_d), &batch_d));
         clCheckError(clEnqueueMigrateMemObjects(
@@ -188,7 +188,7 @@ struct MemoryReaderExecution
     {
         if (batch_size > max_batch_size) {
             std::cerr
-                << "fx::MemoryReader: batch_size is larger than max_batch_size!"
+                << "fx::StreamGenerator: batch_size is larger than max_batch_size!"
                 << "Only " << max_batch_size << " elements are processed."
                 << '\n';
 
@@ -228,7 +228,7 @@ struct MemoryReaderExecution
         clCheckError(clReleaseEvent(migrate_event));
     }
 
-    ~MemoryReaderExecution()
+    ~StreamGeneratorExecution()
     {
         clCheckError(clReleaseMemObject(batch_d));
         clCheckError(clReleaseKernel(kernel));
@@ -240,9 +240,9 @@ struct MemoryReaderExecution
 #endif
 
 template <typename T>
-struct MemoryReader
+struct StreamGenerator
 {
-    using ExecutionQueue = std::deque<MemoryReaderExecution<T> *>;
+    using ExecutionQueue = std::deque<StreamGeneratorExecution<T> *>;
 
     OCL & ocl;
 
@@ -254,10 +254,13 @@ struct MemoryReader
     ExecutionQueue ready_queue;
     ExecutionQueue running_queue;
 
+    T * current_batch;
+    size_t batch_idx;
+
     std::chrono::high_resolution_clock::time_point start_time;
     std::chrono::high_resolution_clock::time_point end_time;
 
-    MemoryReader(
+    StreamGenerator(
         OCL & ocl,
         const size_t batch_size,
         const size_t N = 2,
@@ -270,14 +273,16 @@ struct MemoryReader
     , iterations(0)
     , ready_queue()
     , running_queue()
+    , current_batch(nullptr)
+    , batch_idx(0)
     {
         if (batch_size != max_batch_size) {
-            std::cout << "fx::MemoryReader: `batch_size` is rounded to the next power of 2 ("
+            std::cout << "fx::StreamGenerator: `batch_size` is rounded to the next power of 2 ("
                       << batch_size << " -> " << max_batch_size << ")" << '\n';
         }
 
         for (size_t n = 0; n < number_of_buffers; ++n) {
-            running_queue.push_back(new MemoryReaderExecution<T>(ocl, max_batch_size, replica_id));
+            running_queue.push_back(new StreamGeneratorExecution<T>(ocl, max_batch_size, replica_id));
         }
     }
 
@@ -287,7 +292,7 @@ struct MemoryReader
             start_time = std::chrono::high_resolution_clock::now();
         }
 
-        MemoryReaderExecution<T> * execution = running_queue.front();
+        StreamGeneratorExecution<T> * execution = running_queue.front();
         running_queue.pop_front();
 
         if (iterations >= number_of_buffers) {
@@ -306,11 +311,11 @@ struct MemoryReader
         const bool last = false
     )
     {
-        MemoryReaderExecution<T> * execution = ready_queue.front();
+        StreamGeneratorExecution<T> * execution = ready_queue.front();
         ready_queue.pop_front();
 
         if (batch != execution->get_batch_ptr()) {
-            std::cerr << "fx::MemoryReader: batch pointer mismatch!" << '\n';
+            std::cerr << "fx::StreamGenerator: batch pointer mismatch!" << '\n';
         }
 
         execution->execute(batch_size, last);
@@ -319,12 +324,27 @@ struct MemoryReader
         iterations++;
     }
 
+    void push(const T & item, const bool last = false)
+    {
+        if (current_batch == nullptr) {
+            current_batch = get_batch();
+            batch_idx = 0;
+        }
+
+        current_batch[batch_idx++] = item;
+
+        if (last or (batch_idx == max_batch_size)) {
+            push(current_batch, batch_idx, last);
+            current_batch = nullptr;
+        }
+    }
+
     void launch_kernels() {}
 
     void finish()
     {
         while (!running_queue.empty()) {
-            MemoryReaderExecution<T> * execution = running_queue.front();
+            StreamGeneratorExecution<T> * execution = running_queue.front();
             running_queue.pop_front();
             execution->wait();
             ready_queue.push_back(execution);
@@ -337,12 +357,12 @@ struct MemoryReader
     auto get_end_time() { return end_time; }
     double get_time() { return std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count(); }
 
-    ~MemoryReader()
+    ~StreamGenerator()
     {
         finish();
 
         while (!ready_queue.empty()) {
-            MemoryReaderExecution<T> * execution = ready_queue.front();
+            StreamGeneratorExecution<T> * execution = ready_queue.front();
             ready_queue.pop_front();
             delete execution;
         }
@@ -351,4 +371,4 @@ struct MemoryReader
 
 } // namespace fx
 
-#endif // __MEMORY_READER__
+#endif // __STREAM_GENERATOR__

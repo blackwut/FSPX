@@ -1,5 +1,5 @@
-#ifndef __MEMORY_WRITER__
-#define __MEMORY_WRITER__
+#ifndef __STREAM_DRAINER__
+#define __STREAM_DRAINER__
 
 #include <vector>
 #include <deque>
@@ -12,7 +12,7 @@
 namespace fx {
 
 template <typename T>
-struct MemoryWriterExecution {
+struct StreamDrainerExecution {
 
     OCL & ocl;
     size_t max_batch_size;
@@ -37,7 +37,7 @@ struct MemoryWriterExecution {
     const int eos_argi = 4;
 
 
-    MemoryWriterExecution(
+    StreamDrainerExecution(
         OCL & ocl,
         size_t batch_size,
         const cl_mem * eos_d,
@@ -61,7 +61,7 @@ struct MemoryWriterExecution {
             batch_size * sizeof(T), batch_h,
             &err
         );
-        clCheckErrorMsg(err, "fx::MemoryWriter: failed to create device buffer (batch_d)");
+        clCheckErrorMsg(err, "fx::StreamDrainer: failed to create device buffer (batch_d)");
 
         count_h = aligned_alloc<cl_int>(1);
         count_h[0] = 0;
@@ -72,7 +72,7 @@ struct MemoryWriterExecution {
             sizeof(cl_int), count_h,
             &err
         );
-        clCheckErrorMsg(err, "fx::MemoryWriter: failed to create device buffer (count_d)");
+        clCheckErrorMsg(err, "fx::StreamDrainer: failed to create device buffer (count_d)");
 
         clCheckError(clSetKernelArg(kernel, batch_argi, sizeof(batch_d), &batch_d));
         clCheckError(clSetKernelArg(kernel, count_argi, sizeof(count_d), &count_d));
@@ -93,7 +93,7 @@ struct MemoryWriterExecution {
     {
         if (batch_size > max_batch_size) {
             std::cerr
-                << "fx::MemoryWriter: batch_size is larger than max_batch_size!"
+                << "fx::StreamDrainer: batch_size is larger than max_batch_size!"
                 << "Only " << max_batch_size << " elements are processed."
                 << '\n';
 
@@ -121,7 +121,7 @@ struct MemoryWriterExecution {
         clCheckError(clReleaseEvent(migrate_event));
     }
 
-    ~MemoryWriterExecution()
+    ~StreamDrainerExecution()
     {
         clCheckError(clReleaseMemObject(batch_d));
         clCheckError(clReleaseMemObject(count_d));
@@ -134,9 +134,9 @@ struct MemoryWriterExecution {
 };
 
 template <typename T>
-struct MemoryWriter
+struct StreamDrainer
 {
-    using ExecutionQueue = std::deque<MemoryWriterExecution<T> *>;
+    using ExecutionQueue = std::deque<StreamDrainerExecution<T> *>;
 
     OCL & ocl;
 
@@ -154,7 +154,7 @@ struct MemoryWriter
     std::chrono::high_resolution_clock::time_point start_time;
     std::chrono::high_resolution_clock::time_point end_time;
 
-    MemoryWriter(
+    StreamDrainer(
         OCL & ocl,
         const size_t batch_size,
         const size_t N = 2,
@@ -171,7 +171,7 @@ struct MemoryWriter
     , running_queue()
     {
         if (batch_size != max_batch_size) {
-            std::cout << "fx::MemoryWriter: `batch_size` is rounded to the next power of 2 ("
+            std::cout << "fx::StreamDrainer: `batch_size` is rounded to the next power of 2 ("
                       << batch_size << " -> " << max_batch_size << ")" << '\n';
         }
 
@@ -192,7 +192,7 @@ struct MemoryWriter
             sizeof(cl_int), &eos_ext,
             &err
         );
-        clCheckErrorMsg(err, "fx::MemoryWriter: failed to create device buffer (eos_d)");
+        clCheckErrorMsg(err, "fx::StreamDrainer: failed to create device buffer (eos_d)");
 #else
         eos_d = clCreateBuffer(
             ocl.context,
@@ -200,7 +200,7 @@ struct MemoryWriter
             sizeof(cl_int), &eos_ext,
             &err
         );
-        clCheckErrorMsg(err, "fx::MemoryWriter: failed to create device buffer (eos_d)");
+        clCheckErrorMsg(err, "fx::StreamDrainer: failed to create device buffer (eos_d)");
 
         cl_command_queue queue = ocl.createCommandQueue();
         // clCheckError(clEnqueueWriteBuffer(
@@ -220,7 +220,7 @@ struct MemoryWriter
 #endif
 
         for (size_t n = 0; n < number_of_buffers; ++n) {
-            ready_queue.push_back(new MemoryWriterExecution<T>(ocl, max_batch_size, &eos_d, replica_id));
+            ready_queue.push_back(new StreamDrainerExecution<T>(ocl, max_batch_size, &eos_d, replica_id));
         }
     }
 
@@ -233,7 +233,7 @@ struct MemoryWriter
 
     void launch_kernel(size_t batch_size)
     {
-        MemoryWriterExecution<T> * execution = ready_queue.front();
+        StreamDrainerExecution<T> * execution = ready_queue.front();
         ready_queue.pop_front();
         execution->execute(batch_size);
         running_queue.push_back(execution);
@@ -244,11 +244,11 @@ struct MemoryWriter
         bool * last)
     {
         if (running_queue.empty()) {
-            std::cerr << "fx::MemoryWriter: no launched executions" << '\n';
+            std::cerr << "fx::StreamDrainer: no launched executions" << '\n';
             return nullptr;
         }
 
-        MemoryWriterExecution<T> * execution = running_queue.front();
+        StreamDrainerExecution<T> * execution = running_queue.front();
         running_queue.pop_front();
         execution->wait();
 
@@ -266,7 +266,7 @@ struct MemoryWriter
     void put_batch(T * batch, size_t batch_size)
     {
         if (!batch) {
-            std::cerr << "fx::MemoryWriter: batch is nullptr" << '\n';
+            std::cerr << "fx::StreamDrainer: batch is nullptr" << '\n';
             return;
         }
 
@@ -278,19 +278,19 @@ struct MemoryWriter
     void finish()
     {
         while (!running_queue.empty()) {
-            MemoryWriterExecution<T> * execution = running_queue.front();
+            StreamDrainerExecution<T> * execution = running_queue.front();
             running_queue.pop_front();
             execution->wait();
             ready_queue.push_back(execution);
         }
     }
 
-    ~MemoryWriter()
+    ~StreamDrainer()
     {
         finish();
 
         while (!ready_queue.empty()) {
-            MemoryWriterExecution<T> * execution = ready_queue.front();
+            StreamDrainerExecution<T> * execution = ready_queue.front();
             ready_queue.pop_front();
             delete execution;
         }
@@ -301,4 +301,4 @@ struct MemoryWriter
 };
 }
 
-#endif // __MEMORY_WRITER__
+#endif // __STREAM_DRAINER__
