@@ -23,10 +23,10 @@ struct StreamDrainerExecution {
     cl_command_queue queue;
 
     cl_mem batch_d;
-    cl_mem count_d;
+    cl_mem items_written_d;
 
     T * batch_h;
-    cl_int * count_h;
+    cl_int * items_written_h;
 
     cl_event kernel_event;
     cl_event migrate_event;
@@ -63,22 +63,22 @@ struct StreamDrainerExecution {
         );
         clCheckErrorMsg(err, "fx::StreamDrainer: failed to create device buffer (batch_d)");
 
-        count_h = aligned_alloc<cl_int>(1);
-        count_h[0] = 0;
+        items_written_h = aligned_alloc<cl_int>(1);
+        items_written_h[0] = 0;
 
-        count_d = clCreateBuffer(
+        items_written_d = clCreateBuffer(
             ocl.context,
             CL_MEM_USE_HOST_PTR | CL_MEM_HOST_READ_ONLY | CL_MEM_WRITE_ONLY,
-            sizeof(cl_int), count_h,
+            sizeof(cl_int), items_written_h,
             &err
         );
-        clCheckErrorMsg(err, "fx::StreamDrainer: failed to create device buffer (count_d)");
+        clCheckErrorMsg(err, "fx::StreamDrainer: failed to create device buffer (items_written_d)");
 
         clCheckError(clSetKernelArg(kernel, batch_argi, sizeof(batch_d), &batch_d));
-        clCheckError(clSetKernelArg(kernel, count_argi, sizeof(count_d), &count_d));
+        clCheckError(clSetKernelArg(kernel, count_argi, sizeof(items_written_d), &items_written_d));
         clCheckError(clSetKernelArg(kernel, eos_argi,   sizeof(*eos_d),  eos_d));
 
-        cl_mem buffers[] = {batch_d, count_d};
+        cl_mem buffers[] = {batch_d, items_written_d};
         clCheckError(clEnqueueMigrateMemObjects(
             queue, 2, buffers,
             CL_MIGRATE_MEM_OBJECT_CONTENT_UNDEFINED,
@@ -106,7 +106,7 @@ struct StreamDrainerExecution {
 
         clCheckError(clEnqueueTask(queue, kernel, 0, nullptr, &kernel_event));
 
-        cl_mem buffers[] = {batch_d, count_d, *eos_d};
+        cl_mem buffers[] = {batch_d, items_written_d, *eos_d};
         clCheckError(clEnqueueMigrateMemObjects(
             queue, 3, buffers,
             CL_MIGRATE_MEM_OBJECT_HOST,
@@ -124,11 +124,11 @@ struct StreamDrainerExecution {
     ~StreamDrainerExecution()
     {
         clCheckError(clReleaseMemObject(batch_d));
-        clCheckError(clReleaseMemObject(count_d));
+        clCheckError(clReleaseMemObject(items_written_d));
         clCheckError(clReleaseKernel(kernel));
         clCheckError(clReleaseCommandQueue(queue));
 
-        free(count_h);
+        free(items_written_h);
         free(batch_h);
     }
 };
@@ -240,7 +240,7 @@ struct StreamDrainer
     }
 
     T * pop(
-        size_t * count,
+        size_t * items_written,
         bool * last)
     {
         if (running_queue.empty()) {
@@ -253,7 +253,7 @@ struct StreamDrainer
         execution->wait();
 
         T * batch = execution->batch_h;
-        *count = execution->count_h[0];
+        *items_written = execution->items_written_h[0];
         *last = (eos[0] ? true : false);
 
         ready_queue.push_back(execution);
