@@ -534,17 +534,18 @@ template <
     typename INDEX_T,
     typename FUNCTOR_T,
     int N,
-    typename STREAM_OUT
+    typename STREAM_OUT,
+    typename... Args
 >
 void ReplicateGenerator(
-    STREAM_OUT ostrms[N]
+    STREAM_OUT ostrms[N],
+    Args&&... args
 )
 {
 #pragma HLS dataflow
-    fx::Generator<INDEX_T, FUNCTOR_T, STREAM_OUT> generator[N];
     for (int i = 0; i < N; ++i) {
     #pragma HLS unroll
-        generator[i](ostrms[i]);
+        fx::Generator<INDEX_T, FUNCTOR_T, STREAM_OUT>(ostrms[i], std::forward<Args>(args)...);
     }
 }
 
@@ -559,17 +560,18 @@ template <
     typename INDEX_T,
     typename FUNCTOR_T,
     int N,
-    typename STREAM_IN
+    typename STREAM_IN,
+    typename... Args
 >
 void ReplicateDrainer(
-    STREAM_IN istrms[N]
+    STREAM_IN istrms[N],
+    Args&&... args
 )
 {
 #pragma HLS dataflow
-    fx::Drainer<INDEX_T, FUNCTOR_T, STREAM_IN> drainer[N];
     for (int i = 0; i < N; ++i) {
     #pragma HLS unroll
-        drainer[i](istrms[i]);
+        fx::Drainer<INDEX_T, FUNCTOR_T, STREAM_IN>(istrms[i], std::forward<Args>(args)...);
     }
 }
 
