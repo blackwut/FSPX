@@ -34,21 +34,25 @@ public:
 
     double mean()
     {
+        if (samples_.empty()) return 0.0;
         return std::accumulate(samples_.begin(), samples_.end(), 0.0) / samples_.size();
     }
 
     double min()
     {
+        if (samples_.empty()) return std::numeric_limits<double>::max();
         return *std::min_element(samples_.begin(), samples_.end());
     }
 
     double max()
     {
+        if (samples_.empty()) return std::numeric_limits<double>::min();
         return *std::max_element(samples_.begin(), samples_.end());
     }
 
     double percentile(double percentile)
     {
+        if (samples_.empty()) return 0.0;
         auto pointer = samples_.begin() + samples_.size() * percentile;
         std::nth_element(samples_.begin(), pointer, samples_.end());
         return *pointer;
