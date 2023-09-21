@@ -344,6 +344,8 @@ WMtoWS:
     }
 }
 
+// TODO: remove the constraint of having to fill the whole line (W bits) with
+//       meaningful data.
 template <int W, typename STREAM_OUT>
 void WMtoS(
     ap_uint<W> * in,
@@ -530,7 +532,7 @@ prepare_burst:
             // signal a complete burst
             if (bc + 1 == BURST_LENGTH) {
                 burst_size.write(BURST_LENGTH);
-                items_pack.write(BURST_LENGTH * TMP_ITEMS);
+                items_packed.write(BURST_LENGTH * TMP_ITEMS);
                 bc = 0;
             } else {
                 bc = bc + 1;
@@ -556,11 +558,11 @@ prepare_burst:
     // last burst or partial burst
     if (bc != 0) {
         burst_size.write(bc);
-        items_pack.write(bc * TMP_ITEMS + i);
+        items_packed.write(bc * TMP_ITEMS + i);
     }
     // no more writes
     burst_size.write(0);
-    items_pack.write(0);
+    items_packed.write(0);
 
     // propagate EOS
     eos_signal.write(last);
