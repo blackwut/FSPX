@@ -51,7 +51,7 @@ generate_sp() {
     while [ $idx -lt $1 ]
     do
         sp="${sp} --connectivity.sp=${mw_kernel}_${idx}.out:HBM[$((31 - ${1} + ${idx}))]"
-        sp="${sp} --connectivity.sp=${mw_kernel}_${idx}.written_count:HBM[31]"
+        sp="${sp} --connectivity.sp=${mw_kernel}_${idx}.items_written:HBM[31]"
         sp="${sp} --connectivity.sp=${mw_kernel}_${idx}.eos:HBM[31]"
         idx=$((idx + 1))
     done
