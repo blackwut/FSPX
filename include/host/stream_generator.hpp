@@ -5,127 +5,12 @@
 #include <deque>
 #include <string>
 
+#include "defines.hpp"
 #include "utils.hpp"
 #include "ocl.hpp"
 
 
 namespace fx {
-
-#define MEMORY_MAP 0
-#if MEMORY_MAP
-
-template <typename T>
-struct StreamGeneratorExecution
-{
-    OCL & ocl;
-    size_t max_batch_size;
-    size_t replica_id;
-
-    cl_kernel kernel;
-    cl_command_queue queue;
-
-    cl_mem batch_d;
-    T * batch_h;
-
-    cl_event map_event;
-    cl_event unmap_event;
-    cl_event kernel_event;
-
-    const int batch_argi = 0;
-    const int count_argi = 1;
-    const int eos_argi = 2;
-
-    StreamGeneratorExecution(
-        OCL & ocl,
-        const size_t batch_size,
-        const size_t replica_id = 0
-    )
-    : ocl(ocl)
-    , max_batch_size(batch_size)
-    , replica_id(replica_id)
-    {
-        cl_int err;
-
-        kernel = ocl.createKernel("memory_reader:{memory_reader_" + std::to_string(replica_id + 1) + "}");
-        queue = ocl.createCommandQueue();
-
-        batch_h = aligned_alloc<T>(max_batch_size);
-        batch_d = clCreateBuffer(
-            ocl.context,
-            CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_HOST_WRITE_ONLY,
-            max_batch_size * sizeof(T), nullptr,
-            &err
-        );
-        clCheckErrorMsg(err, "fx::StreamGenerator: failed to create device buffer (batch_d)");
-
-        clCheckError(clSetKernelArg(kernel, batch_argi, sizeof(batch_d), &batch_d));
-    }
-
-    void execute(
-        size_t batch_size,
-        bool eos
-    )
-    {
-        if (batch_size > max_batch_size) {
-            std::cerr
-                << "fx::StreamGenerator: batch_size is larger than max_batch_size!"
-                << "Only " << max_batch_size << " elements are processed."
-                << '\n';
-
-            batch_size = max_batch_size;
-        }
-
-        // TODO: (512 / 8) should be calculated at runtime based on the width of the bus selected for the memory reader
-        const cl_int count_int = static_cast<cl_int>(batch_size / ((512 / 8) / sizeof(T)));
-        const cl_int eos_int = static_cast<cl_int>(eos);
-
-        clCheckError(clSetKernelArg(kernel, count_argi, sizeof(count_int), &count_int));
-        clCheckError(clSetKernelArg(kernel, eos_argi,   sizeof(eos_int),   &eos_int));
-
-        clCheckError(clEnqueueUnmapMemObject(queue, batch_d, batch_h, 0, nullptr, &unmap_event));
-        batch_h = nullptr;
-
-        clCheckError(clEnqueueTask(queue, kernel, 1, &unmap_event, &kernel_event));
-    }
-
-    T * get_batch_ptr()
-    {
-        return batch_h;
-    }
-
-    T * get_batch()
-    {
-        cl_int err;
-        batch_h = static_cast<T *>(clEnqueueMapBuffer(
-            queue, batch_d, CL_FALSE, CL_MAP_WRITE,
-            0, max_batch_size * sizeof(T),
-            0, nullptr, &map_event,
-            &err
-        ));
-        clCheckErrorMsg(err, "fx::StreamGenerator: failed to map device buffer (batch_d)");
-
-        clCheckError(clWaitForEvents(1, &map_event));
-        clCheckError(clReleaseEvent(map_event));
-        return batch_h;
-    }
-
-    void wait()
-    {
-        clCheckError(clWaitForEvents(1, &kernel_event));
-        clCheckError(clReleaseEvent(kernel_event));
-        clCheckError(clReleaseEvent(unmap_event));
-    }
-
-    ~StreamGeneratorExecution()
-    {
-        clCheckError(clReleaseMemObject(batch_d));
-        clCheckError(clReleaseKernel(kernel));
-        clCheckError(clReleaseCommandQueue(queue));
-
-        // free(batch_h);
-    }
-};
-#else
 
 template <typename T>
 struct StreamGeneratorExecution
@@ -224,12 +109,39 @@ struct StreamGeneratorExecution
     void wait()
     {
         clCheckError(clWaitForEvents(1, &kernel_event));
+
+        #if STREAM_GENERATOR_PRINT_TRANSFER_INFO
+        {
+            cl_ulong start_time;
+            cl_ulong end_time;
+            clCheckError(clGetEventProfilingInfo(migrate_event, CL_PROFILING_COMMAND_START, sizeof(start_time), &start_time, NULL));
+            clCheckError(clGetEventProfilingInfo(migrate_event, CL_PROFILING_COMMAND_END, sizeof(end_time), &end_time, NULL));
+            const double time = end_time - start_time;
+            const double size = max_batch_size * sizeof(T);
+            const double bw = size / time;
+            std::cout << "fx::SteramGenerator (MIGRATE)" << bw << " GB/s" << "(start: " << start_time << ", end: " << end_time << ")" << '\n';
+        }
+
+        {
+            cl_ulong start_time;
+            cl_ulong end_time;
+            clCheckError(clGetEventProfilingInfo(kernel_event, CL_PROFILING_COMMAND_START, sizeof(start_time), &start_time, NULL));
+            clCheckError(clGetEventProfilingInfo(kernel_event, CL_PROFILING_COMMAND_END, sizeof(end_time), &end_time, NULL));
+            const double time = end_time - start_time;
+            const double size = max_batch_size * sizeof(T);
+            const double bw = size / time;
+            std::cout << "fx::SteramGenerator (KERNEL): " << bw << " GB/s" << "(start: " << start_time << ", end: " << end_time << ")" << '\n';
+        }
+        #endif
+
         clCheckError(clReleaseEvent(kernel_event));
         clCheckError(clReleaseEvent(migrate_event));
     }
 
     ~StreamGeneratorExecution()
     {
+        clCheckError(clFinish(queue));
+
         clCheckError(clReleaseMemObject(batch_d));
         clCheckError(clReleaseKernel(kernel));
         clCheckError(clReleaseCommandQueue(queue));
@@ -237,7 +149,6 @@ struct StreamGeneratorExecution
         free(batch_h);
     }
 };
-#endif
 
 template <typename T>
 struct StreamGenerator

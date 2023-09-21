@@ -1,4 +1,4 @@
-#ifndef __HOST_OCL__
+    #ifndef __HOST_OCL__
 #define __HOST_OCL__
 
 #include <iostream>
@@ -12,6 +12,7 @@
 // #include "CL/cl_ext_xilinx.h"
 #include "/opt/xilinx/xrt/include/CL/cl_ext_xilinx.h"
 
+#include "defines.hpp"
 #include "utils.hpp"
 
 namespace fx {
@@ -341,65 +342,6 @@ cl_program clCreateBuildProgramFromBinary(cl_context context, const cl_device_id
 //
 //*****************************************************************
 
-// void event_cb(cl_event event1, cl_int cmd_status, void* data) {
-//     cl_int err;
-//     cl_command_type command;
-//     cl::Event event(event1, true);
-//     OCL_CHECK(err, err = event.getInfo(CL_EVENT_COMMAND_TYPE, &command));
-//     cl_int status;
-//     OCL_CHECK(err, err = event.getInfo(CL_EVENT_COMMAND_EXECUTION_STATUS, &status));
-//     const char* command_str;
-//     const char* status_str;
-//     switch (command) {
-//         case CL_COMMAND_READ_BUFFER:
-//             command_str = "buffer read";
-//             break;
-//         case CL_COMMAND_WRITE_BUFFER:
-//             command_str = "buffer write";
-//             break;
-//         case CL_COMMAND_NDRANGE_KERNEL:
-//             command_str = "kernel";
-//             break;
-//         case CL_COMMAND_MAP_BUFFER:
-//             command_str = "kernel";
-//             break;
-//         case CL_COMMAND_COPY_BUFFER:
-//             command_str = "kernel";
-//             break;
-//         case CL_COMMAND_MIGRATE_MEM_OBJECTS:
-//             command_str = "buffer migrate";
-//             break;
-//         default:
-//             command_str = "unknown";
-//     }
-//     switch (status) {
-//         case CL_QUEUED:
-//             status_str = "Queued";
-//             break;
-//         case CL_SUBMITTED:
-//             status_str = "Submitted";
-//             break;
-//         case CL_RUNNING:
-//             status_str = "Executing";
-//             break;
-//         case CL_COMPLETE:
-//             status_str = "Completed";
-//             break;
-//     }
-//     printf("[%s]: %s %s\n", reinterpret_cast<char*>(data), status_str, command_str);
-//     fflush(stdout);
-// }
-
-// void set_callback_enqueue(cl::Event event, const char* name) {
-//     cl_int err;
-//     OCL_CHECK(err, err = event.setCallback(CL_QUEUED, event_cb, (void*)name));
-// }
-
-// void set_callback_complete(cl::Event event, const char* name) {
-//     cl_int err;
-//     OCL_CHECK(err, err = event.setCallback(CL_COMPLETE, event_cb, (void*)name));
-// }
-
 cl_ulong clTimeBetweenEventsNS(cl_event start, cl_event end)
 {
     cl_ulong timeStart;
@@ -460,7 +402,7 @@ struct OCL
         }
     }
 
-    cl_command_queue createCommandQueue(bool profile = true, bool out_of_order = false) {
+    cl_command_queue createCommandQueue(bool profile = COMMAND_QUEUE_PROFILE, bool out_of_order = false) {
         cl_int status;
         cl_command_queue queue;
         queue = clCreateCommandQueue(

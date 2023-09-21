@@ -5,6 +5,7 @@
 #include <deque>
 #include <string>
 
+#include "defines.hpp"
 #include "utils.hpp"
 #include "ocl.hpp"
 
@@ -117,12 +118,38 @@ struct StreamDrainerExecution {
     void wait()
     {
         clCheckError(clWaitForEvents(1, &migrate_event));
-        clCheckError(clReleaseEvent(kernel_event));
+
+        #if STREAM_DRAINER_PRINT_TRANSFER_INFO
+        {
+            cl_ulong start_time;
+            cl_ulong end_time;
+            clCheckError(clGetEventProfilingInfo(migrate_event, CL_PROFILING_COMMAND_START, sizeof(start_time), &start_time, NULL));
+            clCheckError(clGetEventProfilingInfo(migrate_event, CL_PROFILING_COMMAND_END, sizeof(end_time), &end_time, NULL));
+            const double time = end_time - start_time;
+            const double size = max_batch_size * sizeof(T);
+            const double bw = size / time;
+            std::cout << "fx::StreamDrainer (MIGRATE): " << bw << " GB/s" << "(start: " << start_time << ", end: " << end_time << ")" << '\n';
+        }
+        {
+            cl_ulong start_time;
+            cl_ulong end_time;
+            clCheckError(clGetEventProfilingInfo(kernel_event, CL_PROFILING_COMMAND_START, sizeof(start_time), &start_time, NULL));
+            clCheckError(clGetEventProfilingInfo(kernel_event, CL_PROFILING_COMMAND_END, sizeof(end_time), &end_time, NULL));
+            const double time = end_time - start_time;
+            const double size = max_batch_size * sizeof(T);
+            const double bw = size / time;
+            std::cout << "fx::StreamDrainer (KERNEL): " << bw << " GB/s" << "(start: " << start_time << ", end: " << end_time << ")" << '\n';
+        }
+        #endif
+
         clCheckError(clReleaseEvent(migrate_event));
+        clCheckError(clReleaseEvent(kernel_event));
     }
 
     ~StreamDrainerExecution()
     {
+        clCheckError(clFinish(queue));
+
         clCheckError(clReleaseMemObject(batch_d));
         clCheckError(clReleaseMemObject(items_written_d));
         clCheckError(clReleaseKernel(kernel));
@@ -185,15 +212,6 @@ struct StreamDrainer
         eos_ext.param = 0;
         eos_ext.flags = hbm_bank[31];
 
-#if 0
-        eos_d = clCreateBuffer(
-            ocl.context,
-            CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR | CL_MEM_EXT_PTR_XILINX,
-            sizeof(cl_int), &eos_ext,
-            &err
-        );
-        clCheckErrorMsg(err, "fx::StreamDrainer: failed to create device buffer (eos_d)");
-#else
         eos_d = clCreateBuffer(
             ocl.context,
             CL_MEM_USE_HOST_PTR | CL_MEM_READ_WRITE | CL_MEM_EXT_PTR_XILINX,
@@ -203,21 +221,14 @@ struct StreamDrainer
         clCheckErrorMsg(err, "fx::StreamDrainer: failed to create device buffer (eos_d)");
 
         cl_command_queue queue = ocl.createCommandQueue();
-        // clCheckError(clEnqueueWriteBuffer(
-        //     queue, eos_d, CL_TRUE,
-        //     0, sizeof(cl_int), eos,
-        //     0, nullptr, nullptr
-        // ));
-
         clCheckError(clEnqueueMigrateMemObjects(
             queue, 1, &eos_d,
             0,
             0, nullptr, nullptr
         ));
 
-        clFinish(queue);
+        clCheckError(clFinish(queue));
         clCheckError(clReleaseCommandQueue(queue));
-#endif
 
         for (size_t n = 0; n < number_of_buffers; ++n) {
             ready_queue.push_back(new StreamDrainerExecution<T>(ocl, max_batch_size, &eos_d, replica_id));
@@ -299,6 +310,7 @@ struct StreamDrainer
         free(eos);
     }
 };
-}
+
+} // namespace fx
 
 #endif // __STREAM_DRAINER__
