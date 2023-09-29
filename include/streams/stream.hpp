@@ -7,13 +7,6 @@
 
 namespace fx {
 
-// enum class Storage {
-//     Unspecified,  // Let the tool decide
-//     BRAM,
-//     LUTRAM,
-//     SRL
-// };
-
 template <typename T, int DEPTH = 0>
 struct stream
 {

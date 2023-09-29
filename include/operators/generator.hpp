@@ -1,9 +1,9 @@
 #ifndef __GENERATOR_HPP__
 #define __GENERATOR_HPP__
 
-
 #include "../common.hpp"
 #include "../streams/streams.hpp"
+
 
 namespace fx {
 

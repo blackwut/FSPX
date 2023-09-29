@@ -35,7 +35,6 @@ struct FlatMapShipper
     }
 };
 
-
 template <
     typename FUNCTOR_T,
     typename STREAM_IN,
