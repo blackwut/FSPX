@@ -3,7 +3,7 @@
 
 #include "map.hpp"
 #include "filter.hpp"
-// #include "flatmap.hpp"
+#include "flatmap.hpp"
 #include "generator.hpp"
 #include "drainer.hpp"
 

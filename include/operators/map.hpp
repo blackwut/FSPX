@@ -1,7 +1,6 @@
 #ifndef __MAP_HPP__
 #define __MAP_HPP__
 
-
 #include "../common.hpp"
 #include "../streams/streams.hpp"
 

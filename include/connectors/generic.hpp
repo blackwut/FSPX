@@ -1,10 +1,10 @@
 #ifndef __CONNECTORS_GENERIC_HPP__
 #define __CONNECTORS_GENERIC_HPP__
 
-
 #include "ap_int.h"
 #include "../common.hpp"
 #include "../streams/stream.hpp"
+
 
 namespace fx {
 
@@ -18,6 +18,7 @@ void StoS(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     bool last = istrm.read_eos();
@@ -58,6 +59,7 @@ void StoSN_RR(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -99,6 +101,7 @@ void SNtoS_RR(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -126,14 +129,9 @@ SNtoS_RR:
             #endif
 
             ostrm.write(t);
-
-            id = (id + 1 == N) ? 0 : (id + 1);
         }
-        // TODO: this should be correct but in the following link the implementation is different
-        // https://github.com/Xilinx/Vitis_Libraries/blob/2022.2/utils/L1/include/xf_utils_hw/stream_n_to_one/round_robin.hpp#L321
-        //
-        // Explaination: in the linked code the following line is inside the if statement
-        // id = (id + 1 == N) ? 0 : (id + 1);
+
+        id = (id + 1 == N) ? 0 : (id + 1);
     }
 
     ostrm.write_eos();
@@ -152,6 +150,7 @@ void SNMtoS_RR(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -180,13 +179,8 @@ SNMtoS_RR:
             #endif
 
             ostrm.write(t);
-
-            // id = (id + 1 == N) ? 0 : (id + 1);
         }
-        // TODO: this should be correct but in the following link the implementation is different
-        // https://github.com/Xilinx/Vitis_Libraries/blob/2022.2/utils/L1/include/xf_utils_hw/stream_n_to_one/round_robin.hpp#L321
-        //
-        // Explaination: in the linked code the following line is inside the if statement
+
         id = (id + 1 == N) ? 0 : (id + 1);
     }
 
@@ -211,6 +205,7 @@ void StoSN_LB(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -242,7 +237,6 @@ StoSN_LB_EOS:
     }
 }
 
-#if 0
 template <
     int N,
     typename STREAM_IN,
@@ -254,55 +248,7 @@ void SNtoS_LB(
     const char * name = ""
 )
 {
-    using T = typename STREAM_IN::data_t;
-
-    int id = 0;
-    ap_uint<N> lasts = 0;
-    const ap_uint<N> ends = ~lasts;   // set all bits to one
-
-    for (int i = 0; i < N; ++i) {
-    #pragma HLS UNROLL
-        lasts[i] = istrms[i].read_eos();
-    }
-
-SNtoS_LoadBalancer:
-    while (lasts != ends) {
-    #pragma HLS PIPELINE II = 1
-    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-
-        bool last = lasts[id];
-        bool empty = istrms[id].empty();
-
-        if (!last && !empty) {
-            T t = istrms[id].read();
-            lasts[id] = istrms[id].read_eos();
-
-            #if defined(__DEBUG__CONNECTORS__)
-            std::stringstream ss;
-            ss << "SNtoS_LB" << " (from: " << id << ", last: " << lasts[id] << ")";
-            print_debug(ss.str(), name, t);
-            #endif
-
-            ostrm.write(t);
-        }
-
-        id = (id + 1 == N) ? 0 : (id + 1);
-    }
-
-    ostrm.write_eos();
-}
-#else
-template <
-    int N,
-    typename STREAM_IN,
-    typename STREAM_OUT
->
-void SNtoS_LB(
-    STREAM_IN istrms[N],
-    STREAM_OUT & ostrm,
-    const char * name = ""
-)
-{
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -343,7 +289,6 @@ SNtoS_LB:
 
     ostrm.write_eos();
 }
-#endif
 
 template <
     int N,
@@ -358,6 +303,7 @@ void StoSNM_LB(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -389,7 +335,6 @@ StoSNM_LB_EOS:
     }
 }
 
-#if 0
 template <
     int N,
     int M,
@@ -403,58 +348,7 @@ void SNMtoS_LB(
     const char * name = ""
 )
 {
-    using T = typename STREAM_IN::data_t;
-
-    int id = 0;
-    ap_uint<N> lasts = 0;
-    const ap_uint<N> ends = ~lasts;   // set all bits to one
-
-SNMtoS_LoadBalancer_Init:
-    for (int i = 0; i < N; ++i) {
-    #pragma HLS UNROLL
-        lasts[i] = istrms[i][m].read_eos();
-    }
-
-SNMtoS_LoadBalancer:
-    while (lasts != ends) {
-    #pragma HLS PIPELINE II = 1
-    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-
-        bool last = lasts[id];
-        bool empty = istrms[id][m].empty();
-
-        if (!last && !empty) {
-            T t = istrms[id][m].read();
-            lasts[id] = istrms[id][m].read_eos();
-
-            #if defined(__DEBUG__CONNECTORS__)
-            std::stringstream ss;
-            ss << "SNMtoS_LB" << " (from: " << id << ", last: " << lasts[id] << ")";
-            print_debug(ss.str(), name, t);
-            #endif
-
-            ostrm.write(t);
-        }
-
-        id = (id + 1 == N) ? 0 : (id + 1);
-    }
-
-    ostrm.write_eos();
-}
-#else
-template <
-    int N,
-    int M,
-    typename STREAM_IN,
-    typename STREAM_OUT
->
-void SNMtoS_LB(
-    STREAM_IN istrms[N][M],
-    STREAM_OUT & ostrm,
-    int m,
-    const char * name = ""
-)
-{
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int id = 0;
@@ -495,7 +389,7 @@ SNMtoS_LB:
 
     ostrm.write_eos();
 }
-#endif
+
 
 //******************************************************************************
 //
@@ -516,6 +410,7 @@ void StoSN_KB(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     bool last = istrm.read_eos();
@@ -526,8 +421,7 @@ StoSN_KB:
     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
         T t = istrm.read();
         last = istrm.read_eos();
-
-        int key = key_extractor(t);
+        int key = key_extractor(t) % N;
         ostrms[key].write(t);
 
         #if defined(__DEBUG__CONNECTORS__)
@@ -558,6 +452,7 @@ void SNtoS_KB(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int index = 0;
@@ -612,6 +507,7 @@ void SNMtoS_KB(
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     int index = 0;
@@ -662,17 +558,18 @@ template <
     typename STREAM_IN,
     typename STREAM_OUT
 >
-void StoSN_B(
+void StoSN_BR(
     STREAM_IN & istrm,
     STREAM_OUT ostrms[N],
     const char * name = ""
 )
 {
+    UNUSED(name);
     using T = typename STREAM_IN::data_t;
 
     bool last = istrm.read_eos();
 
-StoSN_B:
+StoSN_BR:
     while (!last) {
     #pragma HLS PIPELINE II = 1
     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
@@ -681,18 +578,18 @@ StoSN_B:
 
         #if defined(__DEBUG__CONNECTORS__)
         std::stringstream ss;
-        ss << "StoSN_B" << " (to: all" << ", last: " << last << ")";
+        ss << "StoSN_BR" << " (to: all" << ", last: " << last << ")";
         print_debug(ss.str(), name, t);
         #endif
 
-    StoSN_B_WRITE:
+    StoSN_BR_WRITE:
         for (int i = 0; i < N; ++i) {
         #pragma HLS UNROLL
             ostrms[i].write(t);
         }
     }
 
-StoSN_B_EOS:
+StoSN_BR_EOS:
     for (int i = 0; i < N; ++i) {
     #pragma HLS UNROLL
         ostrms[i].write_eos();

@@ -1,7 +1,6 @@
 #ifndef __FILTER_HPP__
 #define __FILTER_HPP__
 
-
 #include "../common.hpp"
 #include "../streams/streams.hpp"
 

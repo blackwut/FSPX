@@ -1,37 +1,7 @@
-# Prerequisites
-*.d
+# VSCode
+.vscode/
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
-
-# Xilinx HLS
+# v++
 .ipcache/
 .run/
 .Xil/
@@ -56,25 +26,25 @@ opencl_trace.csv
 summary.csv
 *.run_summary
 .lock
+kernels/
+main
 
-
-# vitis_hls
+# Vitis HLS
 Debug/
 .apc/
 .settings/
+solution/
+.cproject
+.project
+.vitis_hls_log_all.xml
+kernel.xml
+hls.app
+
 # .autopilot/
 # build/
 # csim/
 # impl/
 # sim/
 # syn/
-
 # **/solution*/*
 # !**/solution*/*.tcl
-
-solution/
-
-.cproject
-.project
-.vitis_hls_log_all.xml
-kernel.xml

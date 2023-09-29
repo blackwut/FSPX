@@ -6,7 +6,6 @@
 // Code taken from hlslib:
 // https://github.com/definelicht/hlslib/blob/master/include/hlslib/xilinx/DataPack.h#L27
 
-
 template <typename T>
 struct TypeHandler {
     static constexpr int WIDTH = 8 * sizeof(T);

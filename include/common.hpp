@@ -1,24 +1,11 @@
 #ifndef __COMMON__HPP__
 #define __COMMON__HPP__
 
+#include <iostream>
 #include <type_traits>
 #include <limits>
 
 #define UNUSED(x) (void)(x)
-
-#include <iostream>
-#define DUMP_VAR(x) { std::cout << #x << ": " << x << std::endl; }
-#define DUMP_MSG_VAR(msg, x) { std::cout << msg << ": " << x << std::endl; }
-
-
-// #ifndef __SYNTHESIS__
-// #include <iostream>
-// #define DUMP_VAR(x)             { std::cout << #x  << ": " << x << std::endl; }
-// #define DUMP_MSG_VAR(msg, x)    { std::cout << msg << ": " << x << std::endl; }
-// #else
-// #define DUMP_VAR(x)          ((void)0)
-// #define DUMP_MSG_VAR(msg, x) ((void)0)
-// #endif
 
 #ifndef __SYNTHESIS__
 #include <cassert>

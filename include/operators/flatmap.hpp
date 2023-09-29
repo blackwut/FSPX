@@ -1,7 +1,6 @@
 #ifndef __FLATMAP_HPP__
 #define __FLATMAP_HPP__
 
-
 #include "../common.hpp"
 #include "../streams/streams.hpp"
 
@@ -36,11 +35,10 @@ struct FlatMapShipper
     }
 };
 
-
 template <
     typename FUNCTOR_T,
     typename STREAM_IN,
-    typename STREAM_OUT
+    typename STREAM_OUT,
     typename... Args
 >
 void FlatMap(
@@ -52,8 +50,8 @@ void FlatMap(
     using T_IN  = typename STREAM_IN::data_t;
     using T_OUT = typename STREAM_OUT::data_t;
 
-    static FUNCTOR_T func(std::forward<Args>(args)...);
-    static FlatMapShipper<T_OUT> shipper(ostrm);
+    FUNCTOR_T func(std::forward<Args>(args)...);
+    FlatMapShipper<STREAM_OUT> shipper(ostrm);
 
     bool last = istrm.read_eos();
 
