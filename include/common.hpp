@@ -7,15 +7,6 @@
 
 #define UNUSED(x) (void)(x)
 
-// #ifndef __SYNTHESIS__
-// #include <iostream>
-// #define DUMP_VAR(x)             { std::cout << #x  << ": " << x << '\n'; }
-// #define DUMP_MSG_VAR(msg, x)    { std::cout << msg << ": " << x << '\n'; }
-// #else
-// #define DUMP_VAR(x)          ((void)0)
-// #define DUMP_MSG_VAR(msg, x) ((void)0)
-// #endif
-
 #ifndef __SYNTHESIS__
 #include <cassert>
 #define HW_ASSERT(b) assert((b))

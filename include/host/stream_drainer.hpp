@@ -32,10 +32,10 @@ struct StreamDrainerExecution {
     cl_event kernel_event;
     cl_event migrate_event;
 
-    const int batch_argi = 1;
-    const int bs_argi = 2;
-    const int count_argi = 3;
-    const int eos_argi = 4;
+    constexpr int batch_argi = 1;
+    constexpr int bs_argi = 2;
+    constexpr int count_argi = 3;
+    constexpr int eos_argi = 4;
 
 
     StreamDrainerExecution(
@@ -177,9 +177,6 @@ struct StreamDrainer
 
     ExecutionQueue ready_queue;
     ExecutionQueue running_queue;
-
-    std::chrono::high_resolution_clock::time_point start_time;
-    std::chrono::high_resolution_clock::time_point end_time;
 
     StreamDrainer(
         OCL & ocl,

@@ -96,7 +96,7 @@ struct StreamGeneratorExecution
         clCheckError(clEnqueueTask(queue, kernel, 1, &migrate_event, &kernel_event));
     }
 
-    T * get_batch_ptr() // used to be conformant with the mapped version
+    T * get_batch_ptr()
     {
         return batch_h;
     }
@@ -165,12 +165,6 @@ struct StreamGenerator
     ExecutionQueue ready_queue;
     ExecutionQueue running_queue;
 
-    T * current_batch;
-    size_t batch_idx;
-
-    std::chrono::high_resolution_clock::time_point start_time;
-    std::chrono::high_resolution_clock::time_point end_time;
-
     StreamGenerator(
         OCL & ocl,
         const size_t batch_size,
@@ -184,8 +178,6 @@ struct StreamGenerator
     , iterations(0)
     , ready_queue()
     , running_queue()
-    , current_batch(nullptr)
-    , batch_idx(0)
     {
         if (batch_size != max_batch_size) {
             std::cout << "fx::StreamGenerator: `batch_size` is rounded to the next power of 2 ("
@@ -199,10 +191,6 @@ struct StreamGenerator
 
     T * get_batch()
     {
-        if (iterations == 0) {
-            start_time = std::chrono::high_resolution_clock::now();
-        }
-
         StreamGeneratorExecution<T> * execution = running_queue.front();
         running_queue.pop_front();
 
@@ -235,21 +223,6 @@ struct StreamGenerator
         iterations++;
     }
 
-    void push(const T & item, const bool last = false)
-    {
-        if (current_batch == nullptr) {
-            current_batch = get_batch();
-            batch_idx = 0;
-        }
-
-        current_batch[batch_idx++] = item;
-
-        if (last or (batch_idx == max_batch_size)) {
-            push(current_batch, batch_idx, last);
-            current_batch = nullptr;
-        }
-    }
-
     void launch_kernels() {}
 
     void finish()
@@ -260,13 +233,7 @@ struct StreamGenerator
             execution->wait();
             ready_queue.push_back(execution);
         }
-
-        end_time = std::chrono::high_resolution_clock::now();
     }
-
-    auto get_start_time() { return start_time; }
-    auto get_end_time() { return end_time; }
-    double get_time() { return std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count(); }
 
     ~StreamGenerator()
     {

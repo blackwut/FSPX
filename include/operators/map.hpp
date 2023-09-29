@@ -1,12 +1,9 @@
 #ifndef __MAP_HPP__
 #define __MAP_HPP__
 
-
 #include "../common.hpp"
 #include "../streams/streams.hpp"
 
-// TODO: Args are not used in the A2A connectors
-// TODO: Give an identificator to each operator/functor
 
 namespace fx {
 

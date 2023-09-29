@@ -1,10 +1,10 @@
 #ifndef __CONNECTORS_GENERIC_HPP__
 #define __CONNECTORS_GENERIC_HPP__
 
-
 #include "ap_int.h"
 #include "../common.hpp"
 #include "../streams/stream.hpp"
+
 
 namespace fx {
 

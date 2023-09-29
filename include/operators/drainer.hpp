@@ -1,9 +1,9 @@
 #ifndef __DRAINER_HPP__
 #define __DRAINER_HPP__
 
-
 #include "../common.hpp"
 #include "../streams/streams.hpp"
+
 
 namespace fx {
 
