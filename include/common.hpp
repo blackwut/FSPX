@@ -38,6 +38,31 @@ constexpr bool IS_POW2(T v) {
     return (v > 0) && v && !(v & (v - 1));
 }
 
+TEMPLATE_INTEGRAL
+constexpr T POW2(T v) {
+    return 1 << v;
+}
+
+TEMPLATE_INTEGRAL
+constexpr T POW2_CEIL(T v) {
+    return IS_POW2(v) ? v : POW2(LOG2(v) + 1);
+}
+
+TEMPLATE_INTEGRAL
+constexpr T POW2_FLOOR(T v) {
+    return IS_POW2(v) ? v : POW2(LOG2(v));
+}
+
+TEMPLATE_INTEGRAL
+constexpr T DIV_CEIL(T a, T b) {
+    return (a + b - 1) / b;
+}
+
+TEMPLATE_INTEGRAL
+constexpr T DIV_FLOOR(T a, T b) {
+    return a / b;
+}
+
 TEMPLATE_FLOATING
 ALWAYS_INLINE bool approximatelyEqual(const T a, const T b, const T epsilon = std::numeric_limits<T>::epsilon())
 {
