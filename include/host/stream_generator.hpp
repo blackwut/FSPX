@@ -46,6 +46,26 @@ struct StreamGeneratorExecution
         kernel = ocl.createKernel("memory_reader:{memory_reader_" + std::to_string(replica_id) + "}");
         queue = ocl.createCommandQueue();
 
+        #if STREAM_GENERATOR_USE_HOSTMEM
+        cl_mem_ext_ptr_t batch_ext;
+        batch_ext.flags = XCL_MEM_EXT_HOST_ONLY;
+        batch_ext.obj = NULL;
+        batch_ext.param = 0;
+        batch_d = clCreateBuffer(
+            ocl.context,
+            CL_MEM_READ_ONLY | CL_MEM_EXT_PTR_XILINX | CL_MEM_HOST_WRITE_ONLY,
+            max_batch_size * sizeof(T), &batch_ext,
+            &err
+        );
+        clCheckErrorMsg(err, "fx::StreamGenerator: failed to create device buffer (batch_d)");
+        batch_h = (T *)clEnqueueMapBuffer(
+            queue, batch_d, CL_TRUE,
+            CL_MAP_WRITE,
+            0, max_batch_size * sizeof(T),
+            0, nullptr, nullptr, &err
+        );
+        clCheckErrorMsg(err, "fx::StreamGenerator: failed to map device buffer (batch_d)");
+        #else
         batch_h = aligned_alloc<T>(max_batch_size);
         batch_d = clCreateBuffer(
             ocl.context,
@@ -54,6 +74,7 @@ struct StreamGeneratorExecution
             &err
         );
         clCheckErrorMsg(err, "fx::StreamGenerator: failed to create device buffer (batch_d)");
+        #endif
 
         clCheckError(clSetKernelArg(kernel, batch_argi, sizeof(batch_d), &batch_d));
         clCheckError(clEnqueueMigrateMemObjects(
@@ -142,11 +163,18 @@ struct StreamGeneratorExecution
     {
         clCheckError(clFinish(queue));
 
+        #if STREAM_GENERATOR_USE_HOSTMEM
+        clCheckError(clEnqueueUnmapMemObject(queue, batch_d, batch_h, 0, nullptr, nullptr));
+        clCheckError(clFinish(queue));
+        #endif
+
         clCheckError(clReleaseMemObject(batch_d));
         clCheckError(clReleaseKernel(kernel));
         clCheckError(clReleaseCommandQueue(queue));
 
+        #if !STREAM_GENERATOR_USE_HOSTMEM
         free(batch_h);
+        #endif
     }
 };
 

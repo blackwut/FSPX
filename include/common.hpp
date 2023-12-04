@@ -28,14 +28,54 @@
 #define TEMPLATE_INTEGRAL_64    TEMPLATE_INTEGRAL_(8)
 
 TEMPLATE_INTEGRAL
-constexpr T LOG2(T n)
-{
-  return (n < 2) ? 1 : 1 + LOG2(n / 2);
+constexpr bool IS_POW2(T v) {
+    return (v > 0) && v && !(v & (v - 1));
 }
 
 TEMPLATE_INTEGRAL
-constexpr bool IS_POW2(T v) {
-    return (v > 0) && v && !(v & (v - 1));
+constexpr T LOG2_FLOOR(T val) {
+  return val <= 1 ? 0 : 1 + LOG2_FLOOR(val >> 1);
+}
+
+TEMPLATE_INTEGRAL
+constexpr T LOG2_CEIL(T n)
+{
+    return (n <= 1) ? 0 : 1 + LOG2_FLOOR(n - 1);
+}
+
+TEMPLATE_INTEGRAL
+constexpr T POW2(T v) {
+    return 1 << v;
+}
+
+TEMPLATE_INTEGRAL
+constexpr T POW2_CEIL(T v) {
+    return IS_POW2(v) ? v : POW2(LOG2_FLOOR(v) + 1);
+}
+
+TEMPLATE_INTEGRAL
+constexpr T POW2_FLOOR(T v) {
+    return IS_POW2(v) ? v : POW2(LOG2_FLOOR(v));
+}
+
+TEMPLATE_INTEGRAL
+constexpr T DIV_CEIL(T a, T b) {
+    return (a + b - 1) / b;
+}
+
+TEMPLATE_INTEGRAL
+constexpr T DIV_FLOOR(T a, T b) {
+    return a / b;
+}
+
+TEMPLATE_INTEGRAL
+constexpr T MIN_VAL(T a, T b) {
+    return (a < b) ? a : b;
+}
+
+TEMPLATE_INTEGRAL
+constexpr T MAX_VAL(T a, T b) {
+    return (a > b) ? a : b;
 }
 
 TEMPLATE_FLOATING

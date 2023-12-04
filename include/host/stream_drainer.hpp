@@ -32,10 +32,10 @@ struct StreamDrainerExecution {
     cl_event kernel_event;
     cl_event migrate_event;
 
-    constexpr int batch_argi = 1;
-    constexpr int bs_argi = 2;
-    constexpr int count_argi = 3;
-    constexpr int eos_argi = 4;
+    static constexpr int batch_argi = 1;
+    static constexpr int bs_argi = 2;
+    static constexpr int count_argi = 3;
+    static constexpr int eos_argi = 4;
 
 
     StreamDrainerExecution(
@@ -54,8 +54,47 @@ struct StreamDrainerExecution {
         kernel = ocl.createKernel("memory_writer:{memory_writer_" + std::to_string(replica_id) + "}");
         queue = ocl.createCommandQueue();
 
-        batch_h = aligned_alloc<T>(batch_size);
+        #if STREAM_DRAINER_USE_HOSTMEM
+        cl_mem_ext_ptr_t batch_ext;
+        batch_ext.flags = XCL_MEM_EXT_HOST_ONLY;
+        batch_ext.obj = NULL;
+        batch_ext.param = 0;
+        batch_d = clCreateBuffer(
+            ocl.context,
+            CL_MEM_WRITE_ONLY | CL_MEM_EXT_PTR_XILINX | CL_MEM_HOST_READ_ONLY,
+            batch_size * sizeof(T), &batch_ext,
+            &err
+        );
+        clCheckErrorMsg(err, "fx::StreamDrainer: failed to create device buffer (batch_d)");
+        batch_h = (T *)clEnqueueMapBuffer(
+            queue, batch_d, CL_TRUE,
+            CL_MAP_READ,
+            0, batch_size * sizeof(T),
+            0, nullptr, nullptr, &err
+        );
+        clCheckErrorMsg(err, "fx::StreamDrainer: failed to map device buffer (batch_d)");
 
+        cl_mem_ext_ptr_t items_written_ext;
+        items_written_ext.flags = XCL_MEM_EXT_HOST_ONLY;
+        items_written_ext.obj = NULL;
+        items_written_ext.param = 0;
+        items_written_d = clCreateBuffer(
+            ocl.context,
+            CL_MEM_WRITE_ONLY | CL_MEM_EXT_PTR_XILINX | CL_MEM_HOST_READ_ONLY,
+            sizeof(cl_int), &items_written_ext,
+            &err
+        );
+        clCheckErrorMsg(err, "fx::StreamDrainer: failed to create device buffer (items_written_d)");
+        items_written_h = (cl_int *)clEnqueueMapBuffer(
+            queue, items_written_d, CL_TRUE,
+            CL_MAP_READ,
+            0, sizeof(cl_int),
+            0, nullptr, nullptr, &err
+        );
+        clCheckErrorMsg(err, "fx::StreamDrainer: failed to map device buffer (items_written_d)");
+        clCheckError(clFinish(queue));
+        #else
+        batch_h = aligned_alloc<T>(batch_size);
         batch_d = clCreateBuffer(
             ocl.context,
             CL_MEM_USE_HOST_PTR | CL_MEM_HOST_READ_ONLY | CL_MEM_WRITE_ONLY,
@@ -74,6 +113,7 @@ struct StreamDrainerExecution {
             &err
         );
         clCheckErrorMsg(err, "fx::StreamDrainer: failed to create device buffer (items_written_d)");
+        #endif
 
         clCheckError(clSetKernelArg(kernel, batch_argi, sizeof(batch_d), &batch_d));
         clCheckError(clSetKernelArg(kernel, count_argi, sizeof(items_written_d), &items_written_d));
@@ -150,13 +190,21 @@ struct StreamDrainerExecution {
     {
         clCheckError(clFinish(queue));
 
+        #if STREAM_DRAINER_USE_HOSTMEM
+        clCheckError(clEnqueueUnmapMemObject(queue, batch_d, batch_h, 0, nullptr, nullptr));
+        clCheckError(clEnqueueUnmapMemObject(queue, items_written_d, items_written_h, 0, nullptr, nullptr));
+        clCheckError(clFinish(queue));
+        #endif
+
         clCheckError(clReleaseMemObject(batch_d));
         clCheckError(clReleaseMemObject(items_written_d));
         clCheckError(clReleaseKernel(kernel));
         clCheckError(clReleaseCommandQueue(queue));
 
+        #if !STREAM_DRAINER_USE_HOSTMEM
         free(items_written_h);
         free(batch_h);
+        #endif
     }
 };
 
@@ -166,6 +214,7 @@ struct StreamDrainer
     using ExecutionQueue = std::deque<StreamDrainerExecution<T> *>;
 
     OCL & ocl;
+    cl_command_queue queue;
 
     size_t max_batch_size;
     size_t number_of_buffers;
@@ -185,6 +234,7 @@ struct StreamDrainer
         const size_t replica_id = 0
     )
     : ocl(ocl)
+    , queue(ocl.createCommandQueue())
     , max_batch_size(next_pow2(batch_size))
     , number_of_buffers(N)
     , replica_id(replica_id)
@@ -201,6 +251,28 @@ struct StreamDrainer
 
         cl_int err;
 
+        #if STREAM_DRAINER_USE_HOSTMEM
+        cl_mem_ext_ptr_t eos_ext;
+        eos_ext.flags = XCL_MEM_EXT_HOST_ONLY;
+        eos_ext.obj = NULL;
+        eos_ext.param = 0;
+        eos_d = clCreateBuffer(
+            ocl.context,
+            CL_MEM_READ_WRITE | CL_MEM_EXT_PTR_XILINX,
+            sizeof(cl_int), &eos_ext,
+            &err
+        );
+        clCheckErrorMsg(err, "fx::StreamDrainer: failed to create device buffer (eos_d)");
+        eos = (cl_int *)clEnqueueMapBuffer(
+            queue, eos_d, CL_TRUE,
+            CL_MAP_READ,
+            0, sizeof(cl_int),
+            0, nullptr, nullptr, &err
+        );
+        clCheckErrorMsg(err, "fx::StreamDrainer: failed to map device buffer (eos_d)");
+        eos[0] = 0;
+        clCheckError(clFinish(queue));
+        #else
         eos = aligned_alloc<cl_int>(1);
         eos[0] = 0;
 
@@ -216,8 +288,8 @@ struct StreamDrainer
             &err
         );
         clCheckErrorMsg(err, "fx::StreamDrainer: failed to create device buffer (eos_d)");
+        #endif
 
-        cl_command_queue queue = ocl.createCommandQueue();
         clCheckError(clEnqueueMigrateMemObjects(
             queue, 1, &eos_d,
             0,
@@ -225,7 +297,6 @@ struct StreamDrainer
         ));
 
         clCheckError(clFinish(queue));
-        clCheckError(clReleaseCommandQueue(queue));
 
         for (size_t n = 0; n < number_of_buffers; ++n) {
             ready_queue.push_back(new StreamDrainerExecution<T>(ocl, max_batch_size, &eos_d, replica_id));
@@ -303,8 +374,17 @@ struct StreamDrainer
             delete execution;
         }
 
-        clReleaseMemObject(eos_d);
+        #if STREAM_DRAINER_USE_HOSTMEM
+        clCheckError(clEnqueueUnmapMemObject(queue, eos_d, eos, 0, nullptr, nullptr));
+        clCheckError(clFinish(queue));
+        #endif
+
+        clCheckError(clReleaseMemObject(eos_d));
+        clCheckError(clReleaseCommandQueue(queue));
+
+        #if !STREAM_DRAINER_USE_HOSTMEM
         free(eos);
+        #endif
     }
 };
 
