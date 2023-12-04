@@ -11,4 +11,12 @@
 #define STREAM_DRAINER_PRINT_TRANSFER_INFO      1
 #endif
 
+#ifdef WF_HOSTMEM
+#define STREAM_GENERATOR_USE_HOSTMEM            true
+#define STREAM_DRAINER_USE_HOSTMEM              true
+#else
+#define STREAM_GENERATOR_USE_HOSTMEM            false
+#define STREAM_DRAINER_USE_HOSTMEM              false
+#endif
+
 #endif // __HOST_DEFINES_HPP__
