@@ -57,3 +57,17 @@ generate_sp() {
     done
     echo $sp
 }
+
+# HOST MEMORY (--connectivity.sp)
+generate_sp_host() {
+    local sp=""
+    local idx=0
+    while [ $idx -lt $1 ]
+    do
+        sp="${sp} --connectivity.sp=${mw_kernel}_${idx}.out:HOST[0]"
+        sp="${sp} --connectivity.sp=${mw_kernel}_${idx}.items_written:HOST[0]"
+        sp="${sp} --connectivity.sp=${mw_kernel}_${idx}.eos:HOST[0]"
+        idx=$((idx + 1))
+    done
+    echo $sp
+}
