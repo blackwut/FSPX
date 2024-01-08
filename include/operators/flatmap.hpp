@@ -37,6 +37,7 @@ struct FlatMapShipper
 
 template <
     typename FUNCTOR_T,
+    size_t LATENCY = 1,
     typename STREAM_IN,
     typename STREAM_OUT,
     typename... Args
@@ -48,7 +49,7 @@ void FlatMap(
 )
 {
     using T_IN  = typename STREAM_IN::data_t;
-    using T_OUT = typename STREAM_OUT::data_t;
+    // using T_OUT = typename STREAM_OUT::data_t;
 
     FUNCTOR_T func(std::forward<Args>(args)...);
     FlatMapShipper<STREAM_OUT> shipper(ostrm);
@@ -57,7 +58,7 @@ void FlatMap(
 
 FlatMap:
     while (!last) {
-    #pragma HLS PIPELINE II = 1
+    #pragma HLS PIPELINE II = LATENCY
     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
         T_IN in = istrm.read();
         last = istrm.read_eos();
