@@ -1,245 +1,178 @@
 #ifndef __SLIDING_WINDOW_HPP__
 #define __SLIDING_WINDOW_HPP__
 
-// # of buckets = ceil(SIZE / STEP)
-// shift window by STEP
-
-#define ENABLE_IMPLEMENTATION 3 // 0: good, 1: same as 0 , 2: high resources
-
+#include "tumbling_window.hpp"
 
 namespace fx {
 
-template <
-    typename OPERATOR,  // functor to combine two elements
-    unsigned int SIZE,  // window size
-    unsigned int STEP   // step size
->
-struct SlidingCountWindow {
-    // number of buckets
-    static constexpr unsigned int BUCKETS = DIV_CEIL(SIZE, STEP);
+namespace Bucket {
 
-    using IN_T  = typename OPERATOR::IN_T;
-    using AGG_T = typename OPERATOR::AGG_T;
-    using OUT_T = typename OPERATOR::OUT_T;
+//******************************************************************************
+//
+// Count Sliding Window (Bucket implementation)
+//
+// This class implements a count sliding window using a bucket implementation.
+// This implementation is employed when the latency of the operator is greater
+// than 1 and leads to a II = 1.
+//
+//******************************************************************************
+template <typename OP, unsigned int SIZE, unsigned int STEP, unsigned int LATENCY>
+struct CountSlidingWindow
+{
+    static constexpr unsigned int L = OP::LATENCY;
+    static constexpr unsigned int N = DIV_CEIL(SIZE, STEP);
+    using IN_T  = typename OP::IN_T;
+    using AGG_T = typename OP::AGG_T;
+    using OUT_T = typename OP::OUT_T;
 
-    AGG_T buckets[BUCKETS];
-    ap_uint<BUCKETS> init;
-    unsigned int count;
+    using COUNT_T = unsigned int; // ap_uint<LOG2_CEIL(N) + 1>;
 
-    SlidingCountWindow()
-    : init(0)
+    COUNT_T bidx;
+    COUNT_T count;
+
+    CountTumblingWindow<OP, SIZE, L> buckets[N];
+    bool valids[N];
+    OUT_T outs[N];
+
+    CountSlidingWindow()
+    : bidx(0)
     , count(0)
     {
-        #pragma HLS ARRAY_PARTITION variable = buckets complete dim = 1
-        #pragma HLS ARRAY_PARTITION variable = init complete dim = 0
+        #pragma HLS ARRAY_PARTITION variable=buckets type=complete dim=1
+        #pragma HLS ARRAY_PARTITION variable=valids  type=complete dim=1
+        #pragma HLS ARRAY_PARTITION variable=outs    type=complete dim=1
     }
 
-#if ENABLE_IMPLEMENTATION == 0
-    // II = 1 depth = 7
-    void update(const IN_T & in, OUT_T & out, bool & valid_out)
+    bool update(const IN_T in, OUT_T & out)
     {
-    #pragma HLS INLINE
-
-        AGG_T _out = OPERATOR::identity();
-        const bool enable_shift = (count == (SIZE - 1));
-
-        BUCKETING:
-        for (int i = 0; i < BUCKETS; ++i) {
+        // update buckets if inside the window
+        UPDATE_BUCKETS:
+        for (COUNT_T i = 0; i < N; ++i) {
         #pragma HLS UNROLL
-            AGG_T tmp = buckets[i];
-            const AGG_T val = (init[i] ? tmp : OPERATOR::identity());
-            init[i] = 1;
-
-            const bool update_bucket = (i * STEP <= count && count < (i * STEP + SIZE));
-            const AGG_T agg = (update_bucket ? OPERATOR::combine(OPERATOR::lift(in), val) : val);
-            buckets[i] = agg;
-        }
-
-        if (enable_shift) {
-            _out = buckets[0];
-        SHIFT_BUCKETS:
-            for (int i = 0; i < BUCKETS - 1; ++i) {
-            #pragma HLS UNROLL
-                    buckets[i] = buckets[i + 1];
+            const COUNT_T idx = (i >= bidx) ? (i - bidx) : (N - bidx + i);
+            if (idx * STEP <= count && count < (idx * STEP + SIZE)) {
+                valids[i] = buckets[i].update(in, outs[i]);
             }
-            buckets[BUCKETS - 1] = OPERATOR::identity();
         }
 
-        if (enable_shift) {
-            out = OPERATOR::lower(_out);
-            valid_out = true;
+        // get valid and out from first bucket (bidx)
+        bool _valid = valids[bidx];
+        OUT_T _out = outs[bidx];
+
+        // update bidx (if window is complete) and count
+        if (_valid) {
+            bidx = (bidx == (N - 1)) ? 0 : (bidx + 1);
             count -= (STEP - 1);
         } else {
-            out = OPERATOR::lower(OPERATOR::identity());
-            valid_out = false;
-            count++;
-        }
-    }
-#elif ENABLE_IMPLEMENTATION == 1
-    // II = 1 depth = 7
-    void update(const IN_T & in, OUT_T & out, bool & valid_out)
-    {
-    #pragma HLS INLINE
-
-        AGG_T _out = OPERATOR::identity();
-        const bool enable_shift = (count == (SIZE - 1));
-
-        BUCKETING:
-        for (int i = 0; i < BUCKETS; ++i) {
-        #pragma HLS UNROLL
-            AGG_T tmp = buckets[i];
-            const AGG_T val = (init[i] ? tmp : OPERATOR::identity());
-            init[i] = 1;
-
-            const bool update_bucket = (i * STEP <= count && count < (i * STEP + SIZE));
-            AGG_T agg = (update_bucket ? OPERATOR::combine(OPERATOR::lift(in), val) : val);
-
-            if (enable_shift) {
-                if (i == 0) {
-                    _out = agg;
-                } else {
-                    buckets[i - 1] = agg;
-                }
-            } else {
-                buckets[i] = agg;
-            }
-        }
-
-        if (enable_shift) {
-            buckets[BUCKETS - 1] = OPERATOR::identity();
-
-            out = OPERATOR::lower(_out);
-            valid_out = true;
-
-            count -= (STEP - 1);
-        } else {
-            out = OPERATOR::lower(OPERATOR::identity());
-            valid_out = false;
-
-            count++;
-        }
-    }
-#elif ENABLE_IMPLEMENTATION == 2
-    // ------------ WARNING -----------
-    // TODO: CONSUMES A LOT OF RESOURCES!!!
-    // TODO: reports shows a long critical path on INIT (I guess!!)
-    // II = 1 depth = 7
-    void update(const IN_T & in, OUT_T & out, bool & valid)
-    {
-    // #pragma HLS INLINE
-
-    BUCKETING:
-        for (int i = 0; i < BUCKETS; ++i) {
-        #pragma HLS UNROLL
-            if (i * STEP <= count && count < (i * STEP + SIZE)) {
-                const AGG_T tmp = (init[i] ? buckets[i] : OPERATOR::identity());
-                buckets[i] = OPERATOR::combine(OPERATOR::lift(in), tmp);
-                init[i] = 1;
-            }
-        }
-
-        if (count == (SIZE - 1)) {
-            out = OPERATOR::lower(buckets[0]);
-            valid = true;
-            count -= (STEP - 1);
-
-        SW_SHIFT:
-            for (int i = 0; i < BUCKETS - 1; ++i) {
-                buckets[i] = buckets[i + 1];
-            }
-            buckets[BUCKETS - 1] = OPERATOR::identity();
-
-        } else {
-            out = OPERATOR::identity();
-            valid = false;
             count++;
         }
 
-    //     const bool enable_shift = (count == (SIZE - 1));
-    //     const AGG_T agg = (enable_shift ? buckets[0] : OPERATOR::identity());
-    // SW_SHIFT:
-    //     for (int i = 0; i < BUCKETS - 1; ++i) {
-    //         if (enable_shift) {
-    //             buckets[i] = buckets[i + 1];
-    //         }
-    //     }
-    //     if (enable_shift) buckets[BUCKETS - 1] = OPERATOR::identity();
-
-    //     out = OPERATOR::lower(agg);
-    //     valid = enable_shift;
-
-    //     if (enable_shift) {
-    //         count -= (STEP - 1);
-    //     } else {
-    //         count++;
-    //     }
-    }
-#elif ENABLE_IMPLEMENTATION == 3
-// II = 1 depth = 7
-    void update(const IN_T & in, OUT_T & out, bool & valid_out)
-    {
-    // #pragma HLS INLINE
-
-        const bool enable_shift = (count == (SIZE - 1));
-        const AGG_T lifted_in = OPERATOR::lift(in);
-
-        BUCKETING:
-        for (int i = 0; i < BUCKETS; ++i) {
-        #pragma HLS UNROLL
-            const bool update_bucket = (i * STEP <= count && count < (i * STEP + SIZE));
-            AGG_T tmp = buckets[i];
-            buckets[i] = (update_bucket ? OPERATOR::combine(lifted_in, tmp) : lifted_in);
-        }
-
-        const AGG_T _out = (enable_shift ? buckets[0] : OPERATOR::identity());
-
-        if (enable_shift) {
-        SHIFT_BUCKETS:
-            for (int i = 0; i < BUCKETS - 1; ++i) {
-            #pragma HLS UNROLL
-                    buckets[i] = buckets[i + 1];
-            }
-            buckets[BUCKETS - 1] = OPERATOR::identity();
-        }
-
-        if (enable_shift) {
-            out = OPERATOR::lower(_out);
-            valid_out = true;
-            count -= (STEP - 1);
-        } else {
-            out = OPERATOR::lower(OPERATOR::identity());
-            valid_out = false;
-            count++;
-        }
-    }
-#endif
-};
-
-template <
-    typename OPERATOR,  // functor to combine two elements
-    unsigned int SIZE,  // window size
-    unsigned int STEP,  // step size
-    unsigned int KEYS   // max number of keys
->
-struct KeyedSlidingCountWindow {
-
-    using IN_T  = typename OPERATOR::IN_T;
-    using OUT_T = typename OPERATOR::OUT_T;
-
-    SlidingCountWindow<OPERATOR, SIZE, STEP> windows[KEYS];
-
-    KeyedSlidingCountWindow()
-    {
-        #pragma HLS ARRAY_PARTITION variable = windows complete dim = 1
-    }
-
-    void update(const unsigned int & key, const IN_T & in, OUT_T & out, bool & valid)
-    {
-    #pragma HLS INLINE
-        windows[key].update(in, out, valid);
+        // output (even if invalid)
+        out = _out;
+        return _valid;
     }
 };
 
+
+//******************************************************************************
+//
+// Keyed Count Sliding Window (Bucket implementation)
+//
+// This class implements a keyed count sliding window using a bucket
+// implementation. This implementation is employed when the latency of the
+// operator is greater than 1 and leads to a II = LATENCY.
+//
+//******************************************************************************
+template <typename OP, unsigned int KEYS, unsigned int SIZE, unsigned int STEP>
+struct KeyedCountSlidingWindow
+{
+    static constexpr unsigned int L = OP::LATENCY;
+    static constexpr unsigned int N = DIV_CEIL(SIZE, STEP);
+    using IN_T  = typename OP::IN_T;
+    using AGG_T = typename OP::AGG_T;
+    using OUT_T = typename OP::OUT_T;
+
+    using KEY_T = unsigned int;
+    using COUNT_T = unsigned int; // ap_uint<LOG2_CEIL(N) + 1>;
+
+    KEY_T curr_key;
+    COUNT_T curr_bidx;
+    COUNT_T curr_count;
+
+    COUNT_T bidxs[KEYS];
+    COUNT_T counts[KEYS];
+
+    KeyedCountTumblingWindow<OP, KEYS, SIZE> buckets[N];
+    bool valid[N];
+    OUT_T outs[N];
+
+    KeyedCountSlidingWindow()
+    : curr_key(0)
+    , curr_bidx(0)
+    , curr_count(0)
+    {
+        #pragma HLS ARRAY_PARTITION variable=buckets type=complete dim=1
+        #pragma HLS ARRAY_PARTITION variable=valid   type=complete dim=1
+        #pragma HLS ARRAY_PARTITION variable=outs    type=complete dim=1
+
+        #pragma HLS BIND_STORAGE variable=bidxs  type=RAM_S2P impl=BRAM
+        #pragma HLS BIND_STORAGE variable=counts type=RAM_S2P impl=BRAM
+
+        INIT_BIDXS_COUNTS:
+        for (int i = 0; i < KEYS; ++i) {
+        #pragma HLS UNROLL
+            bidxs[i] = 0;
+            counts[i] = 0;
+        }
+    }
+
+    bool update(KEY_T key, const IN_T in, OUT_T & out)
+    {
+    #pragma HLS DEPENDENCE variable=bidxs intra RAW false
+    #pragma HLS DEPENDENCE variable=bidxs inter distance=2 true
+
+    #pragma HLS DEPENDENCE variable=counts intra RAW false
+    #pragma HLS DEPENDENCE variable=counts inter distance=2 true
+
+        // load data from current key if different from previous key
+        bool _same_key = (curr_key == key);
+        if (!_same_key) {
+            bidxs[curr_key] = curr_bidx;
+            counts[curr_key] = curr_count;
+            curr_key = key;
+            curr_bidx = bidxs[key];
+            curr_count = counts[key];
+        }
+
+        // update buckets if inside the window
+        UPDATE_BUCKETS:
+        for (int i = 0; i < N; ++i) {
+        #pragma HLS UNROLL
+            COUNT_T idx = (i >= curr_bidx) ? (i - curr_bidx) : (N - curr_bidx + i);
+            if (idx * STEP <= curr_count && curr_count < (idx * STEP + SIZE)) {
+                valid[i] = buckets[i].update(key, in, outs[i]);
+            }
+        }
+
+        // get valid and out from first bucket (base_idx)
+        bool _valid = valid[curr_bidx];
+        OUT_T _out = outs[curr_bidx];
+
+        // update base_idx (if window is complete) and count
+        if (_valid) {
+            curr_bidx = (curr_bidx == (N - 1)) ? 0 : (curr_bidx + 1);
+            curr_count -= (STEP - 1);
+        } else {
+            curr_count++;
+        }
+
+        // output (even if invalid)
+        out = _out;
+        return _valid;
+    }
+};
+
+} // namespace Bucket
 } // namespace fx
 
 #endif // __SLIDING_WINDOW_HPP__
