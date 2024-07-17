@@ -70,6 +70,7 @@ struct Count {
 
     static AGG_T lift(const IN_T & a) {
     #pragma HLS INLINE
+        UNUSED(a);
         return 1;
     }
 
