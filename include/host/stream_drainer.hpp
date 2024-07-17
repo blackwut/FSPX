@@ -16,12 +16,14 @@ template <typename T>
 struct StreamDrainerExecution {
 
     OCL & ocl;
+    cl_command_queue & queue;
+
     size_t max_batch_size;
     const cl_mem * eos_d;
     size_t replica_id;
 
     cl_kernel kernel;
-    cl_command_queue queue;
+    // cl_command_queue queue;
 
     cl_mem batch_d;
     cl_mem items_written_d;
@@ -40,11 +42,13 @@ struct StreamDrainerExecution {
 
     StreamDrainerExecution(
         OCL & ocl,
+        cl_command_queue & queue,
         size_t batch_size,
         const cl_mem * eos_d,
         size_t replica_id = 0
     )
     : ocl(ocl)
+    , queue(queue)
     , max_batch_size(batch_size)
     , eos_d(eos_d)
     , replica_id(replica_id)
@@ -52,7 +56,7 @@ struct StreamDrainerExecution {
         cl_int err;
 
         kernel = ocl.createKernel("memory_writer:{memory_writer_" + std::to_string(replica_id) + "}");
-        queue = ocl.createCommandQueue();
+        // queue = ocl.createCommandQueue();
 
         #if STREAM_DRAINER_USE_HOSTMEM
         cl_mem_ext_ptr_t batch_ext;
@@ -188,18 +192,22 @@ struct StreamDrainerExecution {
 
     ~StreamDrainerExecution()
     {
-        clCheckError(clFinish(queue));
+        // clCheckError(clFinish(queue));
 
         #if STREAM_DRAINER_USE_HOSTMEM
-        clCheckError(clEnqueueUnmapMemObject(queue, batch_d, batch_h, 0, nullptr, nullptr));
-        clCheckError(clEnqueueUnmapMemObject(queue, items_written_d, items_written_h, 0, nullptr, nullptr));
-        clCheckError(clFinish(queue));
+        cl_event unmap_batch_event;
+        cl_event unmap_items_written_event;
+        clCheckError(clEnqueueUnmapMemObject(queue, batch_d, batch_h, 0, nullptr, &unmap_batch_event));
+        clCheckError(clEnqueueUnmapMemObject(queue, items_written_d, items_written_h, 0, nullptr, &unmap_items_written_event));
+        // clCheckError(clFinish(queue));
+        clCheckError(clReleaseEvent(unmap_batch_event));
+        clCheckError(clReleaseEvent(unmap_items_written_event));
         #endif
 
         clCheckError(clReleaseMemObject(batch_d));
         clCheckError(clReleaseMemObject(items_written_d));
-        clCheckError(clReleaseKernel(kernel));
-        clCheckError(clReleaseCommandQueue(queue));
+        // clCheckError(clReleaseKernel(kernel));
+        // clCheckError(clReleaseCommandQueue(queue));
 
         #if !STREAM_DRAINER_USE_HOSTMEM
         free(items_written_h);
@@ -234,7 +242,7 @@ struct StreamDrainer
         const size_t replica_id = 0
     )
     : ocl(ocl)
-    , queue(ocl.createCommandQueue())
+    , queue(ocl.createCommandQueue(true, true))
     , max_batch_size(next_pow2(batch_size))
     , number_of_buffers(N)
     , replica_id(replica_id)
@@ -299,7 +307,7 @@ struct StreamDrainer
         clCheckError(clFinish(queue));
 
         for (size_t n = 0; n < number_of_buffers; ++n) {
-            ready_queue.push_back(new StreamDrainerExecution<T>(ocl, max_batch_size, &eos_d, replica_id));
+            ready_queue.push_back(new StreamDrainerExecution<T>(ocl, queue, max_batch_size, &eos_d, replica_id));
         }
     }
 
