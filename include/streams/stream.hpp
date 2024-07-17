@@ -7,7 +7,11 @@
 
 namespace fx {
 
-template <typename T, int DEPTH = 0>
+template <typename T, int DEPTH = 2>
+using stream_single = hls::stream<T, DEPTH>;
+
+
+template <typename T, int DEPTH = 2>
 struct stream
 {
     using data_t = T;
