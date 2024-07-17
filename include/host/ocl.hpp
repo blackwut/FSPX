@@ -421,6 +421,36 @@ struct OCL
         return kernel;
     }
 
+    size_t getMemoryReadersCUInfo() {
+
+        cl_int status;
+        cl_kernel kernel = clCreateKernel(program, "memory_reader", &status);
+        clCheckErrorMsg(status, "Failed to create `memory_reader` kernel");
+
+        cl_uint numcus = 0;
+        status = clGetKernelInfo(kernel, CL_KERNEL_COMPUTE_UNIT_COUNT, sizeof(cl_uint), &numcus, nullptr);
+        clCheckErrorMsg(status, "Failed to get number of compute units of `memory_reader` kernel");
+
+        clReleaseKernel(kernel);
+
+        return numcus;
+    }
+
+    size_t getMemoryWritersCUInfo() {
+
+        cl_int status;
+        cl_kernel kernel = clCreateKernel(program, "memory_writer", &status);
+        clCheckErrorMsg(status, "Failed to create `memory_writer` kernel");
+
+        cl_uint numcus = 0;
+        status = clGetKernelInfo(kernel, CL_KERNEL_COMPUTE_UNIT_COUNT, sizeof(cl_uint), &numcus, nullptr);
+        clCheckErrorMsg(status, "Failed to get number of compute units of `memory_writer` kernel");
+
+        clReleaseKernel(kernel);
+
+        return numcus;
+    }
+
     void clean() {
         if (program) clReleaseProgram(program);
         if (context) clReleaseContext(context);
