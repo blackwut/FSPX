@@ -84,4 +84,17 @@ ALWAYS_INLINE bool approximatelyEqual(const T a, const T b, const T epsilon = st
     return std::abs(a - b) <= ( (std::abs(a) < std::abs(b) ? std::abs(b) : std::abs(a)) * epsilon);
 }
 
+template <typename T>
+void print_array(std::string name, const T * array, const unsigned int size)
+{
+    std::cout << name << ": ";
+    for (unsigned int i = 0; i < size; ++i) {
+        std::cout << array[i];
+        if (i < size - 1) {
+            std::cout << ", ";
+        }
+    }
+    std::cout << std::endl;
+}
+
 #endif // __COMMON_HPP__
