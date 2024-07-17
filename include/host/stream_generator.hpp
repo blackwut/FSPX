@@ -16,11 +16,12 @@ template <typename T>
 struct StreamGeneratorExecution
 {
     OCL & ocl;
+    cl_command_queue & queue;
+
     size_t max_batch_size;
     size_t replica_id;
 
     cl_kernel kernel;
-    cl_command_queue queue;
 
     cl_mem batch_d;
     T * batch_h;
@@ -34,17 +35,21 @@ struct StreamGeneratorExecution
 
     StreamGeneratorExecution(
         OCL & ocl,
+        cl_command_queue & queue,
         const size_t batch_size,
         const size_t replica_id = 0
     )
     : ocl(ocl)
+    , queue(queue)
     , max_batch_size(batch_size)
     , replica_id(replica_id)
+    , migrate_event(nullptr)
+    , kernel_event(nullptr)
     {
         cl_int err;
 
         kernel = ocl.createKernel("memory_reader:{memory_reader_" + std::to_string(replica_id) + "}");
-        queue = ocl.createCommandQueue();
+        // queue = ocl.createCommandQueue();
 
         #if STREAM_GENERATOR_USE_HOSTMEM
         cl_mem_ext_ptr_t batch_ext;
@@ -129,7 +134,11 @@ struct StreamGeneratorExecution
 
     void wait()
     {
+        if (kernel_event == nullptr) return;
+
+        // std::cout << "before clWaitForEvents(kernel_event = " << kernel_event << ")";
         clCheckError(clWaitForEvents(1, &kernel_event));
+        // std::cout << "after  clWaitForEvents(kernel_event = " << kernel_event << ")";
 
         #if STREAM_GENERATOR_PRINT_TRANSFER_INFO
         {
@@ -161,16 +170,18 @@ struct StreamGeneratorExecution
 
     ~StreamGeneratorExecution()
     {
-        clCheckError(clFinish(queue));
+        // clCheckError(clFinish(queue));
 
         #if STREAM_GENERATOR_USE_HOSTMEM
-        clCheckError(clEnqueueUnmapMemObject(queue, batch_d, batch_h, 0, nullptr, nullptr));
-        clCheckError(clFinish(queue));
+        cl_event unmap_event;
+        clCheckError(clEnqueueUnmapMemObject(queue, batch_d, batch_h, 0, nullptr, &unmap_event));
+        clCheckError(clWaitForEvents(1, &unmap_event));
+        // clCheckError(clFinish(queue));
         #endif
 
         clCheckError(clReleaseMemObject(batch_d));
         clCheckError(clReleaseKernel(kernel));
-        clCheckError(clReleaseCommandQueue(queue));
+        // clCheckError(clReleaseCommandQueue(queue));
 
         #if !STREAM_GENERATOR_USE_HOSTMEM
         free(batch_h);
@@ -184,6 +195,7 @@ struct StreamGenerator
     using ExecutionQueue = std::deque<StreamGeneratorExecution<T> *>;
 
     OCL & ocl;
+    cl_command_queue queue;
 
     size_t max_batch_size;
     size_t number_of_buffers;
@@ -200,6 +212,7 @@ struct StreamGenerator
         const size_t replica_id = 0
     )
     : ocl(ocl)
+    , queue(ocl.createCommandQueue(true, true))
     , max_batch_size(next_pow2(batch_size))
     , number_of_buffers(N)
     , replica_id(replica_id)
@@ -213,7 +226,7 @@ struct StreamGenerator
         }
 
         for (size_t n = 0; n < number_of_buffers; ++n) {
-            running_queue.push_back(new StreamGeneratorExecution<T>(ocl, max_batch_size, replica_id));
+            running_queue.push_back(new StreamGeneratorExecution<T>(ocl, queue, max_batch_size, replica_id));
         }
     }
 
@@ -272,6 +285,8 @@ struct StreamGenerator
             ready_queue.pop_front();
             delete execution;
         }
+
+        clCheckError(clReleaseCommandQueue(queue));
     }
 };
 
