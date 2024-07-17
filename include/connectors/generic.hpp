@@ -255,11 +255,12 @@ void SNtoS_LB(
     ap_uint<N> lasts = 0;
     const ap_uint<N> ends = ~lasts;   // set all bits to one
 
-SNtoS_LB_INIT:
-    for (int i = 0; i < N; ++i) {
-    #pragma HLS UNROLL
-        lasts[i] = istrms[i].read_eos();
-    }
+// SNtoS_LB_INIT:
+//     for (int i = 0; i < N; ++i) {
+//     #pragma HLS UNROLL
+//         lasts[i] = istrms[i].read_eos();
+//         std::cout << "SN.last[" << i << "]: " << lasts[i] << std::endl;
+//     }
 
 SNtoS_LB:
     while (lasts != ends) {
@@ -355,11 +356,12 @@ void SNMtoS_LB(
     ap_uint<N> lasts = 0;
     const ap_uint<N> ends = ~lasts;   // set all bits to one
 
-SNMtoS_LB_INIT:
-    for (int i = 0; i < N; ++i) {
-    #pragma HLS UNROLL
-        lasts[i] = istrms[i][m].read_eos();
-    }
+// SNMtoS_LB_INIT:
+//     for (int i = 0; i < N; ++i) {
+//     #pragma HLS UNROLL
+//         lasts[i] = istrms[i][m].read_eos();
+//         std::cout << "SNM.last[" << i << "]: " << lasts[i] << std::endl;
+//     }
 
 SNMtoS_LB:
     while (lasts != ends) {
