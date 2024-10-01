@@ -8,6 +8,7 @@
 #include "../operators/operators.hpp"
 #include "generic.hpp"
 
+// #pragma GCC system_header
 
 namespace fx {
 namespace A2A {
@@ -62,13 +63,13 @@ void Emitter(
 Emitter:
     for (int i = 0; i < N; ++i) {
     #pragma HLS unroll
-        if constexpr (POLICY_T == RR) {
+        if (POLICY_T == RR) {
             fx::StoSN_RR<M>(istrms[i], ostrms[i], "Emitter_RR");
-        } else if constexpr (POLICY_T == LB) {
+        } else if (POLICY_T == LB) {
             fx::StoSN_LB<M>(istrms[i], ostrms[i], "Emitter_LB");
-        } else if constexpr (POLICY_T == KB) {
+        } else if (POLICY_T == KB) {
             fx::StoSN_KB<M>(istrms[i], ostrms[i], std::forward<KEY_EXTRACTOR_T>(key_extractor), "Emitter_KB");
-        } else if constexpr (POLICY_T == BR) {
+        } else if (POLICY_T == BR) {
             fx::StoSN_BR<M>(istrms[i], ostrms[i], "Emitter_BR");
         }
     }
@@ -136,29 +137,29 @@ void ReplicateOperator(
     fx::stream<typename STREAM_IN::data_t, 16> snm_to_op;
     fx::stream<typename STREAM_OUT::data_t, 16> op_to_smk;
 
-    if constexpr (IN_POLICY_T == RR) {
+    if (IN_POLICY_T == RR) {
         fx::SNMtoS_RR<N, M>(istrms, snm_to_op, i, "ReplicateOperator_IN_POLICY_RR");
-    } else if constexpr (IN_POLICY_T == LB) {
+    } else if (IN_POLICY_T == LB) {
         fx::SNMtoS_LB<N, M>(istrms, snm_to_op, i, "ReplicateOperator_IN_POLICY_LB");
-    } else if constexpr (IN_POLICY_T == KB) {
+    } else if (IN_POLICY_T == KB) {
         fx::SNMtoS_KB<N, M>(istrms, snm_to_op, i, std::forward<KEY_GENERATOR_T>(key_generator), "ReplicateOperator_IN_POLICY_KB");
     }
 
-    if constexpr (OPERATOR_T == MAP) {
+    if (OPERATOR_T == MAP) {
         fx::Map<FUNCTOR_T>(snm_to_op, op_to_smk);
-    } else if constexpr (OPERATOR_T == FILTER) {
+    } else if (OPERATOR_T == FILTER) {
         fx::Filter<FUNCTOR_T>(snm_to_op, op_to_smk);
-    } else if constexpr (OPERATOR_T == FLATMAP) {
+    } else if (OPERATOR_T == FLATMAP) {
         fx::FlatMap<FUNCTOR_T>(snm_to_op, op_to_smk);
     }
 
-    if constexpr (OUT_POLICY_T == RR) {
+    if (OUT_POLICY_T == RR) {
         fx::StoSN_RR<K>(op_to_smk, ostrms, "ReplicateOperator_OUT_POLICY_RR");
-    } else if constexpr (OUT_POLICY_T == LB) {
+    } else if (OUT_POLICY_T == LB) {
         fx::StoSN_LB<K>(op_to_smk, ostrms, "ReplicateOperator_OUT_POLICY_LB");
-    } else if constexpr (OUT_POLICY_T == KB) {
+    } else if (OUT_POLICY_T == KB) {
         fx::StoSN_KB<K>(op_to_smk, ostrms, std::forward<KEY_EXTRACTOR_T>(key_extractor), "ReplicateOperator_OUT_POLICY_KB");
-    } else if constexpr (OUT_POLICY_T == BR) {
+    } else if (OUT_POLICY_T == BR) {
         fx::StoSN_BR<K>(op_to_smk, ostrms, "ReplicateOperator_OUT_POLICY_BR");
     }
 }
@@ -255,11 +256,11 @@ void Collector(
 Collector:
     for (int i = 0; i < M; ++i) {
     #pragma HLS unroll
-        if constexpr (POLICY_T == RR) {
+        if (POLICY_T == RR) {
             fx::SNMtoS_RR<N, M>(istrms, ostrms[i], i, "Collector_RR");
-        } else if constexpr (POLICY_T == LB) {
+        } else if (POLICY_T == LB) {
             fx::SNMtoS_LB<N, M>(istrms, ostrms[i], i, "Collector_LB");
-        } else if constexpr (POLICY_T == KB) {
+        } else if (POLICY_T == KB) {
             fx::SNMtoS_KB<N, M>(istrms, ostrms[i], i, std::forward<KEY_GENERATOR_T>(key_generator), "Collector_KB");
         }
     }
