@@ -1,6 +1,7 @@
 #ifndef __STREAMS_STREAM_HPP__
 #define __STREAMS_STREAM_HPP__
 
+#pragma GCC system_header
 #include "hls_stream.h"
 #include "../common.hpp"
 
