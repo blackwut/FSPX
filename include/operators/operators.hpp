@@ -6,5 +6,6 @@
 #include "flatmap.hpp"
 #include "generator.hpp"
 #include "drainer.hpp"
+#include "window.hpp"
 
 #endif // __OPERATORS_HPP__
