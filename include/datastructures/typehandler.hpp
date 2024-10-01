@@ -1,6 +1,7 @@
 #ifndef __TYPEHANDLER_HPP__
 #define __TYPEHANDLER_HPP__
 
+#pragma GCC system_header
 #include <ap_int.h>
 
 // Code taken from hlslib:
