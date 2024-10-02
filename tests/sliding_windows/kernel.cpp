@@ -7,13 +7,13 @@ struct Drainer
     #pragma HLS INLINE
 
         out.key = in.key;
-        out.value = 0;
+        out.value = in.wid;
         out.aggregate = in.value;
         out.timestamp = in.timestamp;
     }
 };
 
-void test(in_stream_t & in, out_stream_t & out)
+void kernel(in_stream_t & in, out_stream_t & out)
 {
     using KEY_T = unsigned int;
     using OP = fx::Count<float>;

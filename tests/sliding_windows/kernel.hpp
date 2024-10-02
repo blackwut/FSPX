@@ -21,18 +21,18 @@ struct data_t {
     #endif
 };
 
-static constexpr int WINDOW_SIZE = 1;
-static constexpr int WINDOW_STEP = 1;
-static constexpr int WINDOW_LATENESS = 0;
+static constexpr int WINDOW_SIZE = 5;
+static constexpr int WINDOW_STEP = 3;
+static constexpr int WINDOW_LATENESS = 5;
 
-static constexpr unsigned int MAX_KEYS = 2;
+static constexpr unsigned int MAX_KEYS = 4;
 // static constexpr int DATA_SIZE = MAX_KEYS * (WINDOW_SIZE + ((WINDOW_LATENESS + WINDOW_SIZE - 1) / WINDOW_SIZE)) * 5 + 1;
 static constexpr int DATA_SIZE = 64;
 
 using in_stream_t = fx::axis_stream<data_t, 32>;
 using out_stream_t = fx::axis_stream<data_t, 32>;
 
-void test(
+void kernel(
     in_stream_t & in,
     out_stream_t & out
 );

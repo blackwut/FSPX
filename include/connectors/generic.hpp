@@ -36,6 +36,8 @@ StoS:
         print_debug(ss.str(), name, t);
         #endif
 
+        // std::cout << "StoS: " << t << std::endl;
+
         ostrm.write(t);
     }
     ostrm.write_eos();
@@ -59,7 +61,7 @@ void debug_streams(
     #pragma HLS UNROLL
         bool last = istrms[i].read_eos();
 
-        std::cout << "debug_streams(" << i << ")" << std::endl;
+        // std::cout << "debug_streams(" << i << ")" << std::endl;
     
         debug_streams:
         while (!last) {
@@ -68,7 +70,7 @@ void debug_streams(
             T t = istrms[i].read();
             last = istrms[i].read_eos();
 
-            std::cout << t << std::endl;
+            // std::cout << t << std::endl;
 
             ostrms[i].write(t);
         }
@@ -327,15 +329,15 @@ SNtoS_LB:
 }
 
 
-template <int N>
-void print_bits(const ap_uint<N> val, const std::string message)
-{
-    std::cout << message << ": ";
-    for (int i = N - 1; i >= 0; --i) {
-        std::cout << val[i];
-    }
-    std::cout << std::endl;
-}
+// template <int N>
+// void print_bits(const ap_uint<N> val, const std::string message)
+// {
+//     std::cout << message << ": ";
+//     for (int i = N - 1; i >= 0; --i) {
+//         std::cout << val[i];
+//     }
+//     std::cout << std::endl;
+// }
 
 template <
     int N,
@@ -659,6 +661,7 @@ route_min_rec(
 )
 {
     #pragma HLS INLINE
+    // std::cout << "SoS route_min_rec<1>" << std::endl;
     StoS(istrms[0], ostrm);
 }
 
@@ -710,6 +713,7 @@ route_min_rec(
     }
 
     if (RES == 1) {
+        // std::cout << "SoS with RES = 1" << std::endl;
         StoS(istrms[M * 2], ostrms[M]);
     }
 

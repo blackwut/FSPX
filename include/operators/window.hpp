@@ -342,7 +342,7 @@ template <typename OP, unsigned int KEYS, unsigned int SIZE, unsigned int STEP, 
 struct _keyed_late_sliding_bucket_t
 {
     static constexpr unsigned int L = OP::LATENCY;
-    static constexpr unsigned int N = 1 + DIV_CEIL(SIZE + LATENESS, STEP);
+    static constexpr unsigned int N = DIV_CEIL(SIZE + LATENESS, STEP);
 
     using IN_T  = typename OP::IN_T;
     using AGG_T = typename OP::AGG_T;
@@ -385,6 +385,7 @@ struct _keyed_late_sliding_bucket_t
 
         #pragma HLS array_partition variable=curr_states    type=complete
 
+        std::cout << "KEYS: " << KEYS << " SIZE: " << SIZE << " STEP: " << STEP << " LATENESS: " << LATENESS << " N: " << N << std::endl;
         KEYED_LATE_BUCKET_INIT:
         for (KEY_T k = 0; k < KEYS; ++k) {
         #pragma HLS UNROLL
@@ -442,15 +443,21 @@ struct _keyed_late_sliding_bucket_t
         const WIN_T _left_widx = curr_left_wid % N;
         const WIN_T _base_wid = curr_left_wid - _left_widx;
 
+        // print_array("curr_states", curr_states, N);
+
+
         SEND_RESULTS:
         for (WIN_T i = 0; i < N; ++i) {
         #pragma HLS UNROLL
             const time_state_t<OP> state = curr_states[i];
             if (state.wid >= old_left_wid && state.wid < curr_left_wid) {
+                // std::cout << "output: " << state.to_result_key(key, sequence) << std::endl;
                 ostrms[i].write(state.to_result_key(key, sequence));
             }
         }
         sequence++;
+
+        // std::cout << "key: " << key << " timestamp: " << timestamp << " left_wid: " << _left_wid << " right_wid: " << _right_wid << " drop: " << _drop << std::endl;
 
         if (!_drop) {
             UPDATE_STATE:
@@ -465,6 +472,7 @@ struct _keyed_late_sliding_bucket_t
                     curr_states[i].wid = _wid;
                     curr_states[i].value = OP::combine(agg, OP::lift(in));
                     curr_states[i].timestamp = first_insert ? timestamp : state.timestamp;
+                    // curr_states[i].timestamp = first_insert ? timestamp : (state.timestamp < timestamp ? state.timestamp : timestamp);
                 }
             }
         }
@@ -589,7 +597,7 @@ void KeyedTimeSlidingWindowOperator(
     KEY_EXTRACTOR_T && key_extractor
 )
 {
-    static constexpr unsigned int N = 1 + DIV_CEIL(SIZE, STEP) + DIV_CEIL(LATENESS, SIZE);
+    static constexpr unsigned int N = DIV_CEIL(SIZE + LATENESS, STEP);
 
     using KEY_T = unsigned int;
     using IN_T = typename STREAM_IN::data_t;
@@ -612,7 +620,6 @@ void KeyedTimeSlidingWindowOperator(
             return (a.sequence < b.sequence) || ((a.sequence == b.sequence) && (a.timestamp < b.timestamp));
         }
     );
-    // fx::SNtoS_LB<N>(result_strms, ostrm);
 }
 
 }

@@ -5,7 +5,7 @@
 ############################################################
 
 # Create a project
-open_project -reset test
+open_project -reset kernel
 
 # Add design files
 add_files kernel.cpp
@@ -14,7 +14,7 @@ add_files kernel.cpp
 add_files -tb tb.cpp -cflags "-Wno-unknown-pragmas -Wall" -csimflags "-Wno-unknown-pragmas -Wall"
 
 # Set the top-level function
-set_top test
+set_top kernel
 
 # Create a solution
 open_solution -reset solution -flow_target vitis
