@@ -9,6 +9,7 @@ struct Drainer
         out.key = in.key;
         out.value = in.wid;
         out.aggregate = in.value;
+        // out.aggregate = in.sequence;
         out.timestamp = in.timestamp;
     }
 };

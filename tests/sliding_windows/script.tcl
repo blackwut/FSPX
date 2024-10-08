@@ -27,6 +27,7 @@ create_clock -period 3.33 -name default
 source directives.tcl
 
 config_interface -m_axi_alignment_byte_size 64 -m_axi_latency 64 -m_axi_max_widen_bitwidth 512
+# config_dataflow -override_user_fifo_depth 1024 # ENABLE IT TO VERIFY THAT IS NOT A PROBLEM OF STREAMS DEPTH
 config_rtl -register_reset_num 3
 config_export -format ip_catalog -rtl verilog -vivado_clock 3
 

@@ -36,8 +36,6 @@ StoS:
         print_debug(ss.str(), name, t);
         #endif
 
-        // std::cout << "StoS: " << t << std::endl;
-
         ostrm.write(t);
     }
     ostrm.write_eos();
@@ -61,16 +59,16 @@ void debug_streams(
     #pragma HLS UNROLL
         bool last = istrms[i].read_eos();
 
-        // std::cout << "debug_streams(" << i << ")" << std::endl;
+        std::cout << "debug_streams(" << i << "): ";
     
-        debug_streams:
+        DEBUG_STREAMS:
         while (!last) {
         #pragma HLS PIPELINE II = 1
         #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
             T t = istrms[i].read();
             last = istrms[i].read_eos();
 
-            // std::cout << t << std::endl;
+            std::cout << t << std::endl;
 
             ostrms[i].write(t);
         }
@@ -328,17 +326,6 @@ SNtoS_LB:
     ostrm.write_eos();
 }
 
-
-// template <int N>
-// void print_bits(const ap_uint<N> val, const std::string message)
-// {
-//     std::cout << message << ": ";
-//     for (int i = N - 1; i >= 0; --i) {
-//         std::cout << val[i];
-//     }
-//     std::cout << std::endl;
-// }
-
 template <
     int N,
     typename STREAM_IN,
@@ -377,9 +364,6 @@ SNtoS_LB_check:
     #pragma HLS PIPELINE II = 1
     #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
 
-    // #if !__SYNTHESIS__
-    //     std::cout << "id: " << id << std::endl;
-    // #endif
 
         MASK_T mask = ~MASK_T(0);
         for (int i = 0; i < N; ++i) {
@@ -537,7 +521,7 @@ void SNtoS_Min(
     ostrm.write_eos();
 }
 
-
+#if 0
 template <
     typename STREAM_IN,
     typename STREAM_OUT,
@@ -603,6 +587,82 @@ void route_min(
 
     ostrm.write_eos();
 }
+#else
+
+#if defined(SYNTHESIS)
+#include "hls_print.h"
+#endif
+
+template <
+    typename STREAM_IN,
+    typename STREAM_OUT,
+    typename COMPARATOR
+>
+void route_min(
+    STREAM_IN istrms[2],
+    STREAM_OUT & ostrm,
+    COMPARATOR && comparator
+)
+{
+#pragma HLS INLINE OFF
+    using T = typename STREAM_IN::data_t;
+    using MASK_T = ap_uint<2>;
+
+    MASK_T buffer_mask = 0;
+    T buffer[2];
+    for (int i = 0; i < 2; ++i) {
+    #pragma HLS UNROLL
+        buffer[i].reset();
+    }
+
+    MASK_T lasts = 0;
+    const MASK_T ends = ~lasts;
+
+    ROUTE_MIN_LOOP:
+    while (lasts != ends) {
+    #pragma HLS PIPELINE II = 1
+    
+        // update buffer
+        UPDATE_BUFFER:
+        for (int i = 0; i < 2; ++i) {
+        #pragma HLS UNROLL
+            if (buffer_mask[i] == 0) {
+                if (!istrms[i].empty()) {
+                    buffer[i] = istrms[i].read();
+                    buffer_mask[i] = 1;
+                }
+
+                if (!istrms[i].empty_eos()) {
+                    lasts[i] = istrms[i].read_eos();
+                }
+            }
+
+            #if defined(SYNTHESIS)
+            hls::print("key: %d", buffer[i].key);
+            #endif
+        }
+
+        // find the minimum
+        if (buffer_mask[0] && buffer_mask[1]) {
+            if (comparator(buffer[0], buffer[1])) {
+                ostrm.write(buffer[0]);
+                buffer_mask[0] = 0;
+            } else {
+                ostrm.write(buffer[1]);
+                buffer_mask[1] = 0;
+            }
+        } else if (buffer_mask[0]) {
+            ostrm.write(buffer[0]);
+            buffer_mask[0] = 0;
+        } else if (buffer_mask[1]) {
+            ostrm.write(buffer[1]);
+            buffer_mask[1] = 0;
+        }
+    }
+
+    ostrm.write_eos();
+}
+#endif
 
 
 // template <
@@ -699,7 +759,7 @@ route_min_rec(
 {
     #pragma HLS INLINE
     using T = typename STREAM_IN::data_t;
-    using STREAM_INTERN = fx::stream<T, 2>;
+    using STREAM_INTERN = fx::stream<T, 4>; // TODO: FIX THE DEPTH
 
     static constexpr int M = N / 2;
     static constexpr int RES = N % 2;

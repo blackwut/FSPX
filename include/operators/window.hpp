@@ -467,12 +467,15 @@ struct _keyed_late_sliding_bucket_t
                 const WIN_T _wid  = (i >= _left_widx ? curr_left_wid + i - _left_widx : curr_left_wid + N - _left_widx + i);
                 const bool first_insert = (state.wid != _wid);
                 const AGG_T agg = first_insert ? OP::identity() : state.value;
+                const TIME_T _timestamp = first_insert ? timestamp : (state.timestamp < timestamp ? state.timestamp : timestamp);
+                // const TIME_T _timestamp = timestamp < state.timestamp ? timestamp : state.timestamp;
 
                 if (_left_wid <= _wid && _wid <= _right_wid) {
                     curr_states[i].wid = _wid;
                     curr_states[i].value = OP::combine(agg, OP::lift(in));
-                    curr_states[i].timestamp = first_insert ? timestamp : state.timestamp;
-                    // curr_states[i].timestamp = first_insert ? timestamp : (state.timestamp < timestamp ? state.timestamp : timestamp);
+                    // curr_states[i].timestamp = first_insert ? timestamp : state.timestamp;
+                    // curr_states[i].timestamp = first_insert ? timestamp : _timestamp;
+                    curr_states[i].timestamp = _timestamp;
                 }
             }
         }
@@ -617,9 +620,25 @@ void KeyedTimeSlidingWindowOperator(
     bucket.process(_istrm, vstrm, result_strms, std::forward<KEY_EXTRACTOR_T>(key_extractor));
     fx::route_min_rec<N>(result_strms, ostrm,
         [](const RESULT_T & a, const RESULT_T & b) {
-            return (a.sequence < b.sequence) || ((a.sequence == b.sequence) && (a.timestamp < b.timestamp));
+
+            // return true to keep the minimum
+            // conditions:
+            // 1. a.sequence < b.sequence  -> keep a
+            // 2. a.sequence == b.sequence && a.timestamp < b.timestamp -> keep a
+            // 3. a.sequence == b.sequence && a.timestamp == b.timestamp && a.key < b.key -> keep a
+
+            if (a.sequence != b.sequence) {
+                return a.sequence < b.sequence;
+            }
+            if (a.timestamp != b.timestamp) {
+                return a.timestamp < b.timestamp;
+            }
+            return a.wid < b.wid;
+
+            // return (a.sequence < b.sequence) || ((a.sequence == b.sequence) && (a.timestamp < b.timestamp)) || ((a.sequence == b.sequence) && (a.timestamp == b.timestamp) && (a.wid < b.wid));
         }
     );
+    // fx::SNtoS_LB<N>(result_strms, ostrm);
 }
 
 }

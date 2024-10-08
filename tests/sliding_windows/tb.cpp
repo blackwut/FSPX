@@ -115,7 +115,7 @@ std::vector<data_t> read_output(out_stream_t & out)
             last_timestamp[r.key] = r.timestamp;
         } else {
             if (r.timestamp < last_timestamp[r.key]) {
-                std::cerr << "Error: key " << r.key << " has timestamp " << r.timestamp << " that is less than the last timestamp " << last_timestamp[r.key] << std::endl;
+                // std::cerr << "Error: key " << r.key << " has timestamp " << r.timestamp << " that is less than the last timestamp " << last_timestamp[r.key] << std::endl;
             }
             last_timestamp[r.key] = r.timestamp;
         }
@@ -154,10 +154,11 @@ bool check_results(const std::vector<data_t> data, const std::vector<data_t> exp
             return e.key == d.key && e.aggregate == d.aggregate && e.timestamp == d.timestamp; // ignoring .value in the comparison
         });
         if (it == expected_copy.end()) {
-            std::cerr << "Error: element with key " << d.key << " not found in expected results" << std::endl;
+            std::cerr << "Error: element {" << d.key << ", " << d.value << ", " << d.aggregate << ", " << d.timestamp << "} not found in expected results" << std::endl;
             success = false;
+        } else {
+            expected_copy.erase(it);
         }
-        expected_copy.erase(it);
     }
 
     return success;
@@ -173,9 +174,9 @@ void test(std::vector<data_t> input_data, std::vector<data_t> expected_output, s
     kernel(in, out);
     bool success = check_results(read_output(out), expected_output);
     if (success) {
-        std::cout << "Test " << test_name << " passed" << std::endl;
+        std::cout << "Test " << test_name << " PASSED" << std::endl;
     } else {
-        std::cerr << "Test " << test_name << " failed" << std::endl;
+        std::cerr << "Test " << test_name << " FAILED" << std::endl;
         exit(1);
     }
 }
@@ -224,10 +225,10 @@ int main() {
         {0, 0, 1,  0},
         {0, 0, 1,  7},
         {0, 0, 5,  7},
-        {0, 0, 5, 11},
+        {0, 0, 5,  9},
         {0, 0, 1, 12},
         {0, 0, 1, 18},
-        {0, 0, 4, 22},
+        {0, 0, 4, 18},
         {0, 0, 3, 22}
     };
     test(test_input_random_single_key, test_output_random_single_key, "random_single_key");
@@ -237,22 +238,22 @@ int main() {
     std::vector<data_t> test_output_random_multiple_keys = {
         {0, 0, 3,  0},
         {1, 0, 2,  2},
-        {1, 0, 4,  6},
+        {1, 0, 4,  4},
+        {0, 0, 4,  3},
         {0, 0, 3,  6},
-        {0, 0, 4,  6},
         {0, 0, 1, 13},
         {0, 0, 1, 13},
         {1, 0, 2,  6},
         {1, 0, 2, 15},
         {1, 0, 1, 15},
-        {2, 0, 2,  9},
+        {2, 0, 2,  8},
         {2, 0, 2,  9},
         {2, 0, 1, 15},
         {2, 0, 1, 15},
         {3, 0, 4,  0},
         {3, 0, 4,  3},
-        {3, 0, 6,  7},
-        {3, 0, 3, 10}
+        {3, 0, 6,  6},
+        {3, 0, 3,  9}
     };
     test(test_input_random_multiple_keys, test_output_random_multiple_keys, "random_multiple_keys");
 
