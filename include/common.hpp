@@ -97,4 +97,14 @@ void print_array(std::string name, const T * array, const unsigned int size)
     std::cout << std::endl;
 }
 
+template <int N>
+void print_bits(const ap_uint<N> val, const std::string message)
+{
+    std::cout << message << ": ";
+    for (int i = N - 1; i >= 0; --i) {
+        std::cout << val[i];
+    }
+    std::cout << std::endl;
+}
+
 #endif // __COMMON_HPP__
