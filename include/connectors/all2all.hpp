@@ -13,14 +13,14 @@
 namespace fx {
 namespace A2A {
 
-enum Policy_t {
+enum policy_t {
     RR,
     LB,
     KB,
     BR
 };
 
-enum Operator_t {
+enum operator_t {
     MAP,
     FILTER,
     FLATMAP,
@@ -35,41 +35,42 @@ enum Operator_t {
 //******************************************************************************
 
 template <
-    Policy_t POLICY_T,
-    int N,
-    int M,
-    typename STREAM_IN,
-    typename STREAM_OUT,
-    typename KEY_EXTRACTOR_T = int
+    policy_t policy_out,
+    unsigned int N,
+    unsigned int M,
+    typename stream_in_t,
+    typename stream_out_t,
+    typename key_extractor_t = int
 >
-void Emitter(
-    STREAM_IN istrms[N],
-    STREAM_OUT ostrms[N][M],
-    KEY_EXTRACTOR_T && key_extractor = 0
+void Emitter (
+    stream_in_t istrms[N],
+    stream_out_t ostrms[N][M],
+    key_extractor_t && key_extractor = 0
 )
 {
     HW_STATIC_ASSERT(
         (
-            POLICY_T == RR ||
-            POLICY_T == LB ||
-            POLICY_T == KB ||
-            POLICY_T == BR
+            policy_out == RR ||
+            policy_out == LB ||
+            policy_out == KB ||
+            policy_out == BR
         ),
         "FX: Only RR, LB, KB and BR are supported policies!"
     );
 
-#pragma HLS dataflow
+    #pragma HLS DATAFLOW
 
-Emitter:
-    for (int i = 0; i < N; ++i) {
-    #pragma HLS unroll
-        if (POLICY_T == RR) {
+    Emitter:
+    for (unsigned int i = 0; i < N; ++i) {
+        #pragma HLS UNROLL
+        
+        if (policy_out == RR) {
             fx::StoSN_RR<M>(istrms[i], ostrms[i], "Emitter_RR");
-        } else if (POLICY_T == LB) {
+        } else if (policy_out == LB) {
             fx::StoSN_LB<M>(istrms[i], ostrms[i], "Emitter_LB");
-        } else if (POLICY_T == KB) {
-            fx::StoSN_KB<M>(istrms[i], ostrms[i], std::forward<KEY_EXTRACTOR_T>(key_extractor), "Emitter_KB");
-        } else if (POLICY_T == BR) {
+        } else if (policy_out == KB) {
+            fx::StoSN_KB<M>(istrms[i], ostrms[i], std::forward<key_extractor_t>(key_extractor), "Emitter_KB");
+        } else if (policy_out == BR) {
             fx::StoSN_BR<M>(istrms[i], ostrms[i], "Emitter_BR");
         }
     }
@@ -83,141 +84,143 @@ Emitter:
 //******************************************************************************
 
 template <
-    Operator_t OPERATOR_T,
-    typename FUNCTOR_T,
-    Policy_t IN_POLICY_T,
-    Policy_t OUT_POLICY_T,
-    int N,
-    int M,
-    int K,
-    typename STREAM_IN,
-    typename STREAM_OUT,
-    typename KEY_EXTRACTOR_T = int,
-    typename KEY_GENERATOR_T = int
+    operator_t operator,
+    typename functor_t,
+    policy_t policy_in,
+    policy_t policy_out,
+    unsigned int N,
+    unsigned int M,
+    unsigned int K,
+    typename stream_in_t,
+    typename stream_out_t,
+    typename key_extractor_t = int,
+    typename key_generator_t = int
 >
-void ReplicateOperator(
-    STREAM_IN istrms[N][M],
-    STREAM_OUT ostrms[K],
-    int i,
-    KEY_EXTRACTOR_T && key_extractor = 0,
-    KEY_GENERATOR_T && key_generator = 0
+void ReplicateOperator (
+    stream_in_t istrms[N][M],
+    stream_out_t ostrms[K],
+    unsigned int m,
+    key_extractor_t && key_extractor = 0,
+    key_generator_t && key_generator = 0
 )
 {
     HW_STATIC_ASSERT(
         (
-            IN_POLICY_T == RR ||
-            IN_POLICY_T == LB ||
-            IN_POLICY_T == KB ||
-            IN_POLICY_T == BR
+            policy_in == RR ||
+            policy_in == LB ||
+            policy_in == KB ||
+            policy_in == BR
         ),
-        "FX: fx::A2A::ReplicateOperator IN_POLICY_T supports RR, LB, KB and BR policies only!"
+        "FX: fx::A2A::ReplicateOperator policy_in supports RR, LB, KB and BR policies only!"
     );
 
     HW_STATIC_ASSERT(
         (
-            OPERATOR_T == MAP ||
-            OPERATOR_T == FILTER ||
-            OPERATOR_T == FLATMAP
+            operator == MAP ||
+            operator == FILTER ||
+            operator == FLATMAP
         ),
-        "FX: fx::A2A::ReplicateOperator OPERATOR_T supports MAP, FILTER and FLATMAP operators only!"
+        "FX: fx::A2A::ReplicateOperator operator supports MAP, FILTER and FLATMAP operators only!"
     );
 
     HW_STATIC_ASSERT(
         (
-            OUT_POLICY_T == RR ||
-            OUT_POLICY_T == LB ||
-            OUT_POLICY_T == KB
+            policy_out == RR ||
+            policy_out == LB ||
+            policy_out == KB
         ),
-        "FX: fx::A2A::ReplicateOperator OUT_POLICY_T supports RR, LB, and KB policies only!"
+        "FX: fx::A2A::ReplicateOperator policy_out supports RR, LB, and KB policies only!"
     );
 
-    #pragma HLS dataflow
+    #pragma HLS DATAFLOW
 
     // TODO: chose the right depth for the streams
-    fx::stream<typename STREAM_IN::data_t, 16> snm_to_op;
-    fx::stream<typename STREAM_OUT::data_t, 16> op_to_smk;
+    fx::stream<typename stream_in_t::data_t, 16> snm_to_op;
+    fx::stream<typename stream_out_t::data_t, 16> op_to_smk;
 
-    if (IN_POLICY_T == RR) {
-        fx::SNMtoS_RR<N, M>(istrms, snm_to_op, i, "ReplicateOperator_IN_POLICY_RR");
-    } else if (IN_POLICY_T == LB) {
-        fx::SNMtoS_LB<N, M>(istrms, snm_to_op, i, "ReplicateOperator_IN_POLICY_LB");
-    } else if (IN_POLICY_T == KB) {
-        fx::SNMtoS_KB<N, M>(istrms, snm_to_op, i, std::forward<KEY_GENERATOR_T>(key_generator), "ReplicateOperator_IN_POLICY_KB");
+    if (policy_in == RR) {
+        fx::SNMtoS_RR<N, M>(istrms, snm_to_op, m, "ReplicateOperator_IN_POLICY_RR");
+    } else if (policy_in == LB) {
+        fx::SNMtoS_LB<N, M>(istrms, snm_to_op, m, "ReplicateOperator_IN_POLICY_LB");
+    } else if (policy_in == KB) {
+        fx::SNMtoS_KB<N, M>(istrms, snm_to_op, m, std::forward<key_generator_t>(key_generator), "ReplicateOperator_IN_POLICY_KB");
     }
 
-    if (OPERATOR_T == MAP) {
-        fx::Map<FUNCTOR_T>(snm_to_op, op_to_smk);
-    } else if (OPERATOR_T == FILTER) {
-        fx::Filter<FUNCTOR_T>(snm_to_op, op_to_smk);
-    } else if (OPERATOR_T == FLATMAP) {
-        fx::FlatMap<FUNCTOR_T>(snm_to_op, op_to_smk);
+    if (operator == MAP) {
+        fx::Map<functor_t>(snm_to_op, op_to_smk);
+    } else if (operator == FILTER) {
+        fx::Filter<functor_t>(snm_to_op, op_to_smk);
+    } else if (operator == FLATMAP) {
+        fx::FlatMap<functor_t>(snm_to_op, op_to_smk);
     }
 
-    if (OUT_POLICY_T == RR) {
+    if (policy_out == RR) {
         fx::StoSN_RR<K>(op_to_smk, ostrms, "ReplicateOperator_OUT_POLICY_RR");
-    } else if (OUT_POLICY_T == LB) {
+    } else if (policy_out == LB) {
         fx::StoSN_LB<K>(op_to_smk, ostrms, "ReplicateOperator_OUT_POLICY_LB");
-    } else if (OUT_POLICY_T == KB) {
-        fx::StoSN_KB<K>(op_to_smk, ostrms, std::forward<KEY_EXTRACTOR_T>(key_extractor), "ReplicateOperator_OUT_POLICY_KB");
-    } else if (OUT_POLICY_T == BR) {
+    } else if (policy_out == KB) {
+        fx::StoSN_KB<K>(op_to_smk, ostrms, std::forward<key_extractor_t>(key_extractor), "ReplicateOperator_OUT_POLICY_KB");
+    } else if (policy_out == BR) {
         fx::StoSN_BR<K>(op_to_smk, ostrms, "ReplicateOperator_OUT_POLICY_BR");
     }
 }
 
 template <
-    Operator_t OPERATOR_T,
-    typename FUNCTOR_T,
-    Policy_t IN_POLICY_T,
-    Policy_t OUT_POLICY_T,
-    int N,
-    int M,
-    int K,
-    typename STREAM_IN,
-    typename STREAM_OUT,
-    typename KEY_EXTRACTOR_T = int,
-    typename KEY_GENERATOR_T = int
+    operator_t operator,
+    typename functor_t,
+    policy_t policy_in,
+    policy_t policy_out,
+    unsigned int N,
+    unsigned int M,
+    unsigned int K,
+    typename stream_in_t,
+    typename stream_out_t,
+    typename key_extractor_t = int,
+    typename key_generator_t = int
 >
-void Operator(
-    STREAM_IN istrms[N][M],
-    STREAM_OUT ostrms[M][K],
-    KEY_EXTRACTOR_T && key_extractor = 0,
-    KEY_GENERATOR_T && key_generator = 0
+void Operator (
+    stream_in_t istrms[N][M],
+    stream_out_t ostrms[M][K],
+    key_extractor_t && key_extractor = 0,
+    key_generator_t && key_generator = 0
 )
 {
     HW_STATIC_ASSERT(
         (
-            IN_POLICY_T == RR ||
-            IN_POLICY_T == LB ||
-            IN_POLICY_T == KB ||
-            IN_POLICY_T == BR
+            policy_in == RR ||
+            policy_in == LB ||
+            policy_in == KB ||
+            policy_in == BR
         ),
-        "FX: fx::A2A::Operator IN_POLICY_T supports RR, LB, KB and BR policies only!"
+        "FX: fx::A2A::Operator policy_in supports RR, LB, KB and BR policies only!"
     );
 
     HW_STATIC_ASSERT(
         (
-            OPERATOR_T == MAP ||
-            OPERATOR_T == FILTER ||
-            OPERATOR_T == FLATMAP
+            operator == MAP ||
+            operator == FILTER ||
+            operator == FLATMAP
         ),
-        "FX: fx::A2A::Operator OPERATOR_T supports MAP, FILTER and FLATMAP operators only!"
+        "FX: fx::A2A::Operator operator supports MAP, FILTER and FLATMAP operators only!"
     );
 
     HW_STATIC_ASSERT(
         (
-            OUT_POLICY_T == RR ||
-            OUT_POLICY_T == LB ||
-            OUT_POLICY_T == KB
+            policy_out == RR ||
+            policy_out == LB ||
+            policy_out == KB
         ),
-        "FX: fx::A2A::Operator OUT_POLICY_T supports RR, LB, KB and BR policies only!"
+        "FX: fx::A2A::Operator policy_out supports RR, LB, KB and BR policies only!"
     );
 
-    #pragma HLS dataflow
-A2AOperator:
+    #pragma HLS DATAFLOW
+    
+    A2AOperator:
     for (int i = 0; i < M; ++i) {
-    #pragma HLS unroll
-        ReplicateOperator<OPERATOR_T, FUNCTOR_T, IN_POLICY_T, OUT_POLICY_T, N, M, K>(
-            istrms, ostrms[i], i, std::forward<KEY_EXTRACTOR_T>(key_extractor), std::forward<KEY_GENERATOR_T>(key_generator)
+        #pragma HLS UNROLL
+        
+        ReplicateOperator<operator, functor_t, policy_in, policy_out, N, M, K>(
+            istrms, ostrms[i], i, std::forward<key_extractor_t>(key_extractor), std::forward<key_generator_t>(key_generator)
         );
     }
 }
@@ -230,38 +233,40 @@ A2AOperator:
 //******************************************************************************
 
 template <
-    Policy_t POLICY_T,
-    int N,
-    int M,
-    typename STREAM_IN,
-    typename STREAM_OUT,
-    typename KEY_GENERATOR_T = int
+    policy_t policy_in,
+    unsigned int N,
+    unsigned int M,
+    typename stream_in_t,
+    typename stream_out_t,
+    typename key_generator_t = int
 >
-void Collector(
-    STREAM_IN istrms[N][M],
-    STREAM_OUT ostrms[M],
-    KEY_GENERATOR_T && key_generator = 0
+void Collector (
+    stream_in_t istrms[N][M],
+    stream_out_t ostrms[M],
+    key_generator_t && key_generator = 0
 )
 {
     HW_STATIC_ASSERT(
         (
-            POLICY_T == RR ||
-            POLICY_T == LB ||
-            POLICY_T == KB
+            policy_in == RR ||
+            policy_in == LB ||
+            policy_in == KB
         ),
         "FX: fx::A2A::Collector supports RR, LB, and KB policies only!"
     );
 
-#pragma HLS dataflow
-Collector:
+    #pragma HLS DATAFLOW
+    
+    Collector:
     for (int i = 0; i < M; ++i) {
-    #pragma HLS unroll
-        if (POLICY_T == RR) {
+        #pragma HLS UNROLL
+        
+        if (policy_in == RR) {
             fx::SNMtoS_RR<N, M>(istrms, ostrms[i], i, "Collector_RR");
-        } else if (POLICY_T == LB) {
+        } else if (policy_in == LB) {
             fx::SNMtoS_LB<N, M>(istrms, ostrms[i], i, "Collector_LB");
-        } else if (POLICY_T == KB) {
-            fx::SNMtoS_KB<N, M>(istrms, ostrms[i], i, std::forward<KEY_GENERATOR_T>(key_generator), "Collector_KB");
+        } else if (policy_in == KB) {
+            fx::SNMtoS_KB<N, M>(istrms, ostrms[i], i, std::forward<key_generator_t>(key_generator), "Collector_KB");
         }
     }
 }
@@ -274,21 +279,24 @@ Collector:
 //******************************************************************************
 
 template <
-    typename INDEX_T,
-    typename FUNCTOR_T,
-    int N,
-    typename STREAM_OUT,
+    typename index_t,
+    typename functor_t,
+    unsigned int N,
+    typename stream_out_t,
     typename... Args
 >
-void ReplicateGenerator(
-    STREAM_OUT ostrms[N],
+void ReplicateGenerator (
+    stream_out_t ostrms[N],
     Args&&... args
 )
 {
-#pragma HLS dataflow
-    for (int i = 0; i < N; ++i) {
-    #pragma HLS unroll
-        fx::Generator<INDEX_T, FUNCTOR_T, STREAM_OUT>(ostrms[i], std::forward<Args>(args)...);
+    #pragma HLS DATAFLOW
+    
+    ReplicateGenerator:
+    for (unsigned int i = 0; i < N; ++i) {
+        #pragma HLS UNROLL
+        
+        fx::Generator<index_t, functor_t, stream_out_t>(ostrms[i], std::forward<Args>(args)...);
     }
 }
 
@@ -300,21 +308,24 @@ void ReplicateGenerator(
 //******************************************************************************
 
 template <
-    typename INDEX_T,
-    typename FUNCTOR_T,
-    int N,
-    typename STREAM_IN,
+    typename index_t,
+    typename functor_t,
+    unsigned int N,
+    typename stream_in_t,
     typename... Args
 >
-void ReplicateDrainer(
-    STREAM_IN istrms[N],
+void ReplicateDrainer (
+    stream_in_t istrms[N],
     Args&&... args
 )
 {
-#pragma HLS dataflow
-    for (int i = 0; i < N; ++i) {
-    #pragma HLS unroll
-        fx::Drainer<INDEX_T, FUNCTOR_T, STREAM_IN>(istrms[i], std::forward<Args>(args)...);
+    #pragma HLS DATAFLOW
+    
+    ReplicateDrainer:
+    for (unsigned int i = 0; i < N; ++i) {
+        #pragma HLS UNROLL
+        
+        fx::Drainer<index_t, functor_t, stream_in_t>(istrms[i], std::forward<Args>(args)...);
     }
 }
 

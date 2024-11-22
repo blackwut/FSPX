@@ -8,41 +8,45 @@
 namespace fx {
 
 template <
-    typename FUNCTOR_T,
-    typename STREAM_IN,
-    typename STREAM_OUT,
+    typename functor_t,
+    typename stream_in_t,
+    typename stream_out_t,
     typename... Args
 >
 void Filter(
-    STREAM_IN & istrm,
-    STREAM_OUT & ostrm,
+    stream_in_t & istrm,
+    stream_out_t & ostrm,
     Args&&... args
 )
 {
-    using T_IN  = typename STREAM_IN::data_t;
-    using T_OUT = typename STREAM_OUT::data_t;
+    #pragma HLS INLINE recursive // TODO: check if this is needed
+    
+    using input_t  = typename stream_in_t::data_t;
+    using output_t = typename stream_out_t::data_t;
+
+    functor_t func(std::forward<Args>(args)...);
 
     bool last = istrm.read_eos();
 
-    FUNCTOR_T func(std::forward<Args>(args)...);
-
-Filter:
+    Filter:
     while (!last) {
-    #pragma HLS PIPELINE II = 1
-    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-        T_IN in = istrm.read();
+        #pragma HLS PIPELINE II = 1
+        #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+        
+        input_t in = istrm.read();
         last = istrm.read_eos();
 
-        T_OUT out;
+        output_t out;
         bool flag = false;
         func(in, out, flag);
         if (flag) {
             ostrm.write(out);
         }
     }
+
     ostrm.write_eos();
 }
 
-}
+} // namespace fx
 
 #endif // __FILTER_HPP__

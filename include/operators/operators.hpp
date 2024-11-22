@@ -1,11 +1,11 @@
 #ifndef __OPERATORS_HPP__
 #define __OPERATORS_HPP__
 
-#include "map.hpp"
 #include "filter.hpp"
+#include "map.hpp"
 #include "flatmap.hpp"
+#include "window.hpp"
 #include "generator.hpp"
 #include "drainer.hpp"
-#include "window.hpp"
 
 #endif // __OPERATORS_HPP__

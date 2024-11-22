@@ -9,7 +9,10 @@
 
 namespace fx {
 
-template <typename T, int DEPTH = 2>
+template <
+    typename T,
+    unsigned int DEPTH = 2
+>
 struct axis_stream
 {
     using data_t = T;
@@ -19,29 +22,33 @@ struct axis_stream
     hls::stream<wdata_t> data;
     hls::stream<weos_t> e_data;
 
-    axis_stream() {
+    axis_stream()
+    {
         #pragma HLS INTERFACE mode=axis port=data
         #pragma HLS INTERFACE mode=axis port=e_data
     }
 
     axis_stream(const char * name)
-    : axis_stream<T, DEPTH>() {
+    : axis_stream<T, DEPTH>()
+    {
         data.set_name(name);
         // e_data.set_name(name);
     }
 
     T read()
     {
-    #pragma HLS INLINE
+        #pragma HLS INLINE
+        
         wdata_t d = data.read();
         return d.data;
     }
 
-    void write(const T & v)
+    void write(const T & t)
     {
-    #pragma HLS INLINE
+        #pragma HLS INLINE
+        
         wdata_t d;
-        d.data = v;
+        d.data = t;
         d.keep = -1;
         data.write(d);
 
@@ -53,14 +60,16 @@ struct axis_stream
 
     bool read_eos()
     {
-    #pragma HLS INLINE
+        #pragma HLS INLINE
+        
         weos_t e = e_data.read();
         return e.data;
     }
 
     void write_eos()
     {
-    #pragma HLS INLINE
+        #pragma HLS INLINE
+        
         weos_t e;
         e.data = true;
         e.keep = -1;
@@ -69,25 +78,25 @@ struct axis_stream
 
     bool empty()
     {
-    #pragma HLS INLINE
+        #pragma HLS INLINE
         return data.empty();
     }
 
     bool empty_eos()
     {
-    #pragma HLS INLINE
+        #pragma HLS INLINE
         return e_data.empty();
     }
 
     bool full()
     {
-    #pragma HLS INLINE
+        #pragma HLS INLINE
         return data.full();
     }
 
     bool full_eos()
     {
-    #pragma HLS INLINE
+        #pragma HLS INLINE
         return e_data.full();
     }
 };

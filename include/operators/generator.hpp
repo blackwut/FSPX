@@ -8,30 +8,32 @@
 namespace fx {
 
 template <
-    typename INDEX_T,
-    typename FUNCTOR_T,
-    typename STREAM_OUT,
+    typename index_t,
+    typename functor_t,
+    typename stream_out_t,
     typename... Args
 >
 void Generator(
-    STREAM_OUT & ostrm,
+    stream_out_t & ostrm,
     Args&&... args
 )
 {
-    using T_OUT = typename STREAM_OUT::data_t;
+    using output_t = typename stream_out_t::data_t;
 
-    FUNCTOR_T func(std::forward<Args>(args)...);
+    index_t index = 0;
+    functor_t func(std::forward<Args>(args)...);
 
     bool last = false;
-    INDEX_T index = 0;
-Generator:
+
+    Generator:
     while (!last) {
-    #pragma HLS PIPELINE II = 1
-    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-        T_OUT out;
+        #pragma HLS PIPELINE II = 1
+        #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+        
+        output_t out;
         func(index, out, last);
         ostrm.write(out);
-        ++index;
+        index++;
     }
     ostrm.write_eos();
 }

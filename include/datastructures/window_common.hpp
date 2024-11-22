@@ -11,186 +11,314 @@
 
 namespace fx {
 
-template <typename OP>
-struct count_result_t
+//*****************************************************************************
+//
+//
+// COUNT STRUCTURES
+//
+//
+//*****************************************************************************
+
+template <
+    typename window_functor_t,
+    unsigned int SIZE
+>
+struct CountBucket_t
 {
-    using WIN_T  = unsigned int;
-    using OUT_T  = typename OP::OUT_T;
+    using count_t = uint_for<SIZE>;
+    using tuple_t = arg_t(0, window_functor_t::operator());
+    using result_t = arg_t(1, window_functor_t::operator());
 
-    WIN_T wid;
-    OUT_T value;
+    wid_t wid;
+    result_t state;
+    count_t count;
+    
+    CountBucket_t()
+    : wid(wid_t(-1))
+    , state()
+    , count(count_t(1))
+    {}
 
-    count_result_t(
-        const WIN_T wid,
-        const OUT_T value
+    CountBucket_t(const wid_t wid)
+    : wid(wid)
+    , state()
+    , count(count_t(1))
+    {}
+
+    CountBucket_t (
+        const wid_t wid,
+        const count_t count
     )
     : wid(wid)
-    , value(value)
+    , state()
+    , count(count)
     {}
 
-    count_result_t()
-    : count_result_t(WIN_T(-1), OP::lower(OP::identity()))
+    CountBucket_t (
+        const wid_t wid,
+        const result_t state,
+        const count_t count
+    )
+    : wid(wid)
+    , state(state)
+    , count(count)
     {}
 
-    count_result_t(const count_result_t & other)
-    : count_result_t(other.wid, other.value)
-    {}
-
-    count_result_t & operator=(const count_result_t & other)
+    CountBucket_t operator=(const CountBucket_t & other)
     {
-    #pragma HLS INLINE
+        #pragma HLS INLINE
+        
         wid = other.wid;
-        value = other.value;
+        count = other.count;
+        state = other.state;
         return *this;
     }
 
-    bool operator==(const count_result_t & other) const
+    bool is_empty() const
     {
-    #pragma HLS INLINE
-        return wid == other.wid && value == other.value;
+        #pragma HLS INLINE
+        return count == count_t(1);
     }
 
-    bool operator!=(const count_result_t & other) const
+    bool is_closing() const
     {
-    #pragma HLS INLINE
-        return !(*this == other);
+        #pragma HLS INLINE
+        return count == count_t(SIZE);
     }
 
-    bool is_valid() const
+    void increment_count (
+        const bool valid,
+        const unsigned int multiplier = 1
+    )
     {
-    #pragma HLS INLINE
-        return wid != WIN_T(-1);
+        #pragma HLS INLINE
+        
+        if (valid) {
+            wid += multiplier;
+            count = count_t(1);
+        } else {
+            count++;
+        }
     }
 
-    void reset()
+    bool update(
+        const tuple_t & tuple,
+        const bool flush,
+        const unsigned int multiplier = 1
+    )
     {
-    #pragma HLS INLINE
-        wid = WIN_T(-1);
-        value = OP::lower(OP::identity());
+        #pragma HLS INLINE
+        
+        static window_functor_t winop;
+        const bool empty = is_empty();
+
+        result_t tmp;
+        if (!empty) {
+            tmp = state;
+        } 
+        winop(tuple, tmp);
+
+        if (!flush) {
+            state = tmp;
+        }
+
+        const bool valid = is_closing() || (flush && !empty);
+        increment_count(valid, multiplier);
+        return valid;
+    }
+
+    wid_t get_wid() const
+    {
+        #pragma HLS INLINE
+        return wid;
+    }
+
+    result_t get_result() const
+    {
+        #pragma HLS INLINE
+        return state;
+    }
+
+    count_t get_count() const
+    {
+        #pragma HLS INLINE
+        return count;
     }
 
     #if !defined(__SYNTHESIS__)
-    friend std::ostream & operator<<(std::ostream & os, const count_result_t & result)
+    friend std::ostream & operator<<(std::ostream & os, const CountBucket_t & state)
     {
-        os << "(wid: "    << std::setw(3) << (int)result.wid
-           << ", value: " << std::setw(3) << result.value << ")";
-
+        os << "("
+           << "wid: "   << std::setw(3) << (int)state.wid   << ", "
+           << "state: " << state.state                      << ", "
+           << "count: " << std::setw(3) << (int)state.count
+           << ")";
         return os;
     }
     #endif
 };
 
-
-template <typename OP, unsigned int SIZE>
-struct count_state_t
+template <
+    typename T,
+    unsigned int SIZE
+>
+struct CountWindowWrapper_t
 {
-    using WIN_T   = unsigned int;
-    using IN_T    = typename OP::IN_T;
-    using AGG_T   = typename OP::AGG_T;
-    using COUNT_T = unsigned int;
+    using tuple_t = T;
 
-    WIN_T wid;
-    AGG_T value;
-    COUNT_T count;
+    key_t key;
+    tuple_t tuple;
+    bool flush;
 
-    count_state_t(
-        const WIN_T wid,
-        const AGG_T value,
-        const COUNT_T count
+    CountWindowWrapper_t()
+    : key(-1)
+    , tuple()
+    , flush(true)
+    {}
+
+    CountWindowWrapper_t(const key_t key)
+    : key(key)
+    , tuple()
+    , flush(true)
+    {}
+
+    CountWindowWrapper_t (
+        const key_t key,
+        const tuple_t & tuple,
     )
-    : wid(wid)
-    , value(value)
+    : key(key)
+    , tuple(tuple)
+    , flush(false)
+    {}
+
+    CountWindowWrapper_t (
+        const key_t key,
+        const tuple_t & tuple,
+        const bool flush
+    )
+    : key(key)
+    , tuple(tuple)
+    , flush(flush)
+    {}
+
+    CountWindowWrapper_t & operator=(const CountWindowWrapper_t & other)
+    {
+        #pragma HLS INLINE
+        
+        key = other.key;
+        tuple = other.tuple;
+        flush = other.flush;
+        return *this;
+    }
+
+    key_t get_key() const
+    {
+        #pragma HLS INLINE
+        return key;
+    }
+
+    tuple_t unwrap() const
+    {
+        #pragma HLS INLINE
+        return tuple;
+    }
+
+    bool is_flush() const
+    {
+        #pragma HLS INLINE
+        return flush;
+    }
+
+    #if !defined(__SYNTHESIS__)
+    friend std::ostream & operator<<(std::ostream & os, const CountWindowWrapper_t & wrapper)
+    {
+        os << "("
+           << "key: "   << std::setw(3) << (int)wrapper.key     << ", "
+           << "tuple: " << wrapper.tuple                        << ", "
+           << "flush: " << (wrapper.flush ? "true" : "false")
+           << ")";
+        return os;
+    }
+    #endif
+};
+
+template <
+    typename T,
+    unsigned int SIZE
+>
+struct CountWindowResult_t
+{
+    using tuple_t = T;
+    using count_t = uint_for<SIZE>;
+
+    key_t key;
+    tuple_t tuple;
+    wid_t wid;
+    count_t count;
+
+    CountWindowResult_t()
+    : key(-1)
+    , tuple()
+    , wid(-1)
+    , count(0)
+    {}
+
+    CountWindowResult_t (
+        const key_t key,
+        const tuple_t & tuple,
+        const wid_t wid,
+        const count_t count
+    )
+    : key(key)
+    , tuple(tuple)
+    , wid(wid)
     , count(count)
     {}
 
-    count_state_t()
-    : count_state_t(WIN_T(-1), OP::identity(), COUNT_T(0))
-    {}
-
-    count_state_t(const count_state_t & other)
-    : count_state_t(other.wid, other.value, other.count)
-    {}
-
-    count_state_t & operator=(const count_state_t & other)
+    CountWindowResult_t & operator=(const CountWindowResult_t & other)
     {
-    #pragma HLS INLINE
+        #pragma HLS INLINE
+        
+        key = other.key;
+        tuple = other.tuple;
         wid = other.wid;
-        value = other.value;
         count = other.count;
         return *this;
     }
 
-    bool operator==(const count_state_t & other) const
+    key_t get_key() const
     {
-    #pragma HLS INLINE
-        return wid == other.wid && value == other.value && count == other.count;
+        #pragma HLS INLINE
+        return key;
     }
 
-    bool operator!=(const count_state_t & other) const
+    tuple_t unwrap() const
     {
-    #pragma HLS INLINE
-        return !(*this == other);
+        #pragma HLS INLINE
+        return tuple;
     }
 
-    bool is_empty() const
+    wid_t get_wid() const
     {
-    #pragma HLS INLINE
-        return count == COUNT_T(0);
+        #pragma HLS INLINE
+        return wid;
     }
 
-    bool is_closing() const
+    count_t get_count() const
     {
-    #pragma HLS INLINE
-        return count == (SIZE - 1);
-    }
-
-    bool is_valid() const
-    {
-    #pragma HLS INLINE
-        return wid != WIN_T(-1);
-    }
-
-    void increment_count()
-    {
-    #pragma HLS INLINE
-        count = is_closing() ? COUNT_T(0) : count + COUNT_T(1);
-    }
-
-    void update(const AGG_T _value)
-    {
-    #pragma HLS INLINE
-
-        const AGG_T _agg = is_empty() ? OP::identity() : value;
-        value = OP::combine(_agg, _value);
-        increment_count();
-    }
-
-    void update(const IN_T _value)
-    {
-    #pragma HLS INLINE
-        update(OP::lift(_value));
-    }
-
-    count_result_t<OP> to_result() const
-    {
-    #pragma HLS INLINE
-        return count_result_t<OP>(wid, OP::lower(value));
-    }
-
-    void reset()
-    {
-    #pragma HLS INLINE
-        wid = WIN_T(-1);
-        value = OP::identity();
-        count = COUNT_T(0);
+        #pragma HLS INLINE
+        return count;
     }
 
     #if !defined(__SYNTHESIS__)
-    friend std::ostream & operator<<(std::ostream & os, const count_state_t & state)
+    friend std::ostream & operator<<(std::ostream & os, const CountWindowResult_t & result)
     {
-        os << "(wid: "    << std::setw(3) << (int)state.wid
-           << ", value: " << std::setw(3) << state.value
-           << ", count: " << std::setw(3) << state.count << ")";
+        os << "("
+           << "key: "   << std::setw(3) << (int)result.key   << ", "
+           << "tuple: " << result.tuple                      << ", "
+           << "wid: "   << std::setw(3) << (int)result.wid   << ", "
+           << "count: " << std::setw(3) << (int)result.count
+           << ")";
         return os;
     }
     #endif
@@ -203,224 +331,383 @@ struct count_state_t
 // TIME STRUCTURES
 //
 //
-// *****************************************************************************
+//*****************************************************************************
 
-
-template <typename OP>
-struct time_result_t
+template <typename window_functor_t>
+struct TimeBucket_t
 {
-    using WIN_T  = unsigned int;
-    using OUT_T  = typename OP::OUT_T;
-    using TIME_T = unsigned int;
+    using tuple_t  = arg_t(0, window_functor_t::operator());
+    using result_t = arg_t(1, window_functor_t::operator());
 
-    WIN_T wid;
-    OUT_T value;
-    TIME_T timestamp;
+    wid_t wid;
+    result_t state;
 
-    time_result_t(
-        const WIN_T wid,
-        const OUT_T value,
-        const TIME_T timestamp
+    TimeBucket_t()
+    : wid(wid_t(-1))
+    , state()
+    {}
+
+    TimeBucket_t(const wid_t wid)
+    : wid(wid)
+    , state()
+    {}
+
+    TimeBucket_t (
+        const wid_t wid,
+        const result_t state
     )
     : wid(wid)
-    , value(value)
-    , timestamp(timestamp)
+    , state(state)
     {}
 
-    time_result_t()
-    : time_result_t(WIN_T(-1), OP::lower(OP::identity()), TIME_T(-1))
-    {}
-
-    time_result_t(const time_result_t & other)
-    : time_result_t(other.wid, other.value, other.timestamp)
-    {}
-
-    time_result_t & operator=(const time_result_t & other)
+    TimeBucket_t operator=(const TimeBucket_t & other)
     {
-    #pragma HLS INLINE
+        #pragma HLS INLINE
+
         wid = other.wid;
-        value = other.value;
-        timestamp = other.timestamp;
+        state = other.state;
         return *this;
     }
 
-    bool is_valid() const
+    void update(
+        const tuple_t & tuple,
+        const wid_t new_wid
+    )
     {
-    #pragma HLS INLINE
-        return wid != WIN_T(-1);
-    }
+        #pragma HLS INLINE
 
-    void reset()
-    {
-    #pragma HLS INLINE
-        wid = WIN_T(-1);
-        value = OP::lower(OP::identity());
-        timestamp = TIME_T(-1);
+        static window_functor_t window_functor;
+
+        result_t tmp = wid != new_wid ? result_t() : state;
+        window_functor(tuple, tmp);
+
+        s.wid = new_wid;
+        s.state = tmp;
     }
 
     #if !defined(__SYNTHESIS__)
-    friend std::ostream & operator<<(std::ostream & os, const time_result_t & result)
+    friend std::ostream & operator<<(std::ostream & os, const TimeBucket_t & state)
     {
-        os << "(wid: "        << std::setw(3) << (int)result.wid
-           << ", value: "     << std::setw(3) << result.value
-           << ", timestamp: " << std::setw(3) << (int)result.timestamp << ")";
+        os << "("
+           << "wid: "   << std::setw(3) << (int)state.wid << ", "
+           << "state: " << state.state
+           << ")";
         return os;
     }
     #endif
 };
 
-
-template <typename OP, typename KEY_T>
-struct keyed_time_result_t
+template <
+    typename T,
+    unsigned int SIZE,
+    unsigned int STEP
+>
+struct TimeWindowWrapper_t
 {
-    using WIN_T  = unsigned int;
-    using OUT_T  = typename OP::OUT_T;
-    using TIME_T = unsigned int;
-    using SEQ_T  = ap_uint<64>;
+    using tuple_t = T;
 
-    WIN_T wid;
-    KEY_T key;
-    OUT_T value;
-    TIME_T timestamp;
-    TIME_T sequence;
+    key_t key;
+    tuple_t tuple;
+    bool flush;
+    wid_t first;
+    wid_t last;
 
-    keyed_time_result_t(
-        const WIN_T wid,
-        const KEY_T key,
-        const OUT_T value,
-        const TIME_T timestamp,
-        const TIME_T sequence
-    )
-    : wid(wid)
-    , key(key)
-    , value(value)
-    , timestamp(timestamp)
-    , sequence(sequence)
-    {}
-
-    keyed_time_result_t()
-    : keyed_time_result_t(WIN_T(-1), KEY_T(-1), OP::lower(OP::identity()), TIME_T(-1), TIME_T(-1))
-    {}
-
-    keyed_time_result_t(const keyed_time_result_t & other)
-    : keyed_time_result_t(other.wid, other.key, other.value, other.timestamp, other.sequence)
-    {}
-
-    keyed_time_result_t & operator=(const keyed_time_result_t & other)
+    wid_t calculate_first(const timestamp_t timestamp) const
     {
-    #pragma HLS INLINE
-        wid = other.wid;
+        #pragma HLS INLINE
+        return wid_t(timestamp < SIZE ? 0 : DIV_CEIL(timestamp - SIZE + 1, STEP));
+    }
+
+    wid_t calculate_last(const timestamp_t timestamp) const
+    {
+        #pragma HLS INLINE
+        return wid_t(DIV_FLOOR(timestamp, STEP));
+    }
+
+    TimeWindowWrapper_t()
+    : key(0) // TODO: check if 0 is ok or put back -1
+    , tuple()
+    , flush(true)
+    , first(0)
+    , last(-1)
+    {}
+
+    TimeWindowWrapper_t(const key_t key)
+    : key(key)
+    , tuple()
+    , flush(true)
+    , first(0)
+    , last(-1)
+    {}
+
+    TimeWindowWrapper_t(const tuple_t tuple)
+    : key(0)
+    , tuple(tuple)
+    , flush(false)
+    , first(calculate_first(tuple.timestamp))
+    , last(calculate_last(tuple.timestamp))
+    {}
+
+    TimeWindowWrapper_t (
+        const key_t key,
+        const tuple_t & tuple
+    )
+    : key(key)
+    , tuple(tuple)
+    , flush(false)
+    , first(calculate_first(tuple.timestamp))
+    , last(calculate_last(tuple.timestamp))
+    {}
+
+    TimeWindowWrapper_t & operator=(const TimeWindowWrapper_t & other)
+    {
+        #pragma HLS INLINE
+
         key = other.key;
-        value = other.value;
-        timestamp = other.timestamp;
-        sequence = other.sequence;
+        tuple = other.tuple;
+        flush = other.flush;
+        first = other.first;
+        last = other.last;
         return *this;
     }
 
-    bool is_valid() const
+    key_t & get_key() const
     {
-    #pragma HLS INLINE
-        return wid != WIN_T(-1);
+        #pragma HLS INLINE
+        return key;
     }
 
-    void reset()
+    tuple_t unwrap() const
     {
-    #pragma HLS INLINE
-        wid = WIN_T(-1);
-        key = KEY_T(-1);
-        value = OP::lower(OP::identity());
-        timestamp = TIME_T(-1);
-        sequence = TIME_T(-1);
+        #pragma HLS INLINE
+        return tuple;
+    }
+
+    timestamp_t get_timestamp() const
+    {
+        #pragma HLS INLINE
+        return tuple.timestamp;
+    }
+
+    bool is_flush() const
+    {
+        #pragma HLS INLINE
+        return flush;
+    }
+
+    wid_t get_first() const
+    {
+        #pragma HLS INLINE
+        return first;
+    }
+
+    wid_t get_last() const
+    {
+        #pragma HLS INLINE
+        return last;
     }
 
     #if !defined(__SYNTHESIS__)
-    friend std::ostream & operator<<(std::ostream & os, const keyed_time_result_t & result)
+    friend std::ostream & operator<<(std::ostream & os, const TimeWindowWrapper_t & wrapper)
     {
-        os << "(wid: "        << std::setw(3) << (int)result.wid
-           << ", key: "       << std::setw(3) << result.key
-           << ", value: "     << std::setw(3) << result.value
-           << ", timestamp: " << std::setw(3) << (int)result.timestamp
-           << ", sequence: "  << std::setw(3) << (int)result.sequence << ")";
-
+        os << "("
+           << "key: "   << std::setw(3) << (int)wrapper.key   << ", "
+           << "tuple: " << wrapper.tuple                      << ", "
+           << "flush: " << (wrapper.flush ? "true" : "false") << ", "
+           << "first: " << std::setw(3) << (int)wrapper.first << ", "
+           << "last: "  << std::setw(3) << (int)wrapper.last
+           << ")";
         return os;
     }
     #endif
 };
 
-
-template <typename OP>
-struct time_state_t
+template <
+    typename T,
+    unsigned int SIZE,
+    unsigned int STEP
+>
+struct TimeWindowResult_t
 {
-    using WIN_T  = unsigned int;
-    using AGG_T  = typename OP::AGG_T;
-    using TIME_T = unsigned int;
+    using tuple_t = T;
+    
+    key_t key;
+    tuple_t tuple;
+    seq_t sequence;
+    wid_t wid;
+    timestamp_t timestamp;
 
-    WIN_T wid;
-    AGG_T value;
-    TIME_T timestamp;
-
-    // time_state_t(const WIN_T wid, const AGG_T value, const TIME_T timestamp)
-    // : wid(wid)
-    // , value(value)
-    // , timestamp(timestamp)
-    // {}
-
-    // time_state_t()
-    // : time_state_t(WIN_T(-1), OP::identity(), TIME_T(-1))
-    // {}
-
-    // time_state_t(const time_state_t & other)
-    // : time_state_t(other.wid, other.value, other.timestamp)
-    // {}
-
-    time_state_t & operator=(const time_state_t & other)
+    timestamp_t calculate_timestamp(const wid_t wid) const
     {
-    #pragma HLS INLINE
+        #pragma HLS INLINE
+        return wid * STEP + SIZE - 1;
+    }
+
+    TimeWindowResult_t()
+    : key(-1)
+    , tuple()
+    , sequence(0)
+    , wid(-1)
+    , timestamp(calculate_timestamp(-1))
+    {}
+
+    TimeWindowResult_t(const tuple_t tuple)
+    : key(0)
+    , tuple(tuple)
+    , sequence(0)
+    , wid(0)
+    , timestamp(calculate_timestamp(0))
+    {}
+
+    TimeWindowResult_t (
+        const key_t key,
+        const tuple_t tuple,
+        const seq_t sequence = 0,
+        const wid_t wid = 0
+    )
+    : key(key)
+    , tuple(tuple)
+    , sequence(sequence)
+    , wid(wid)
+    , timestamp(calculate_timestamp(wid))
+    {}
+
+    TimeWindowResult_t & operator=(const TimeWindowResult_t & other)
+    {
+        #pragma HLS INLINE
+
+        key = other.key;
+        tuple = other.tuple;
+        sequence = other.sequence;
         wid = other.wid;
-        value = other.value;
         timestamp = other.timestamp;
         return *this;
     }
 
-    bool is_valid() const
+    key_t get_key() const
     {
-    #pragma HLS INLINE
-        return wid != WIN_T(-1);
+        #pragma HLS INLINE
+        return key;
     }
 
-    void reset()
+    tuple_t unwrap() const
     {
-    #pragma HLS INLINE
-        wid = WIN_T(-1);
-        value = OP::identity();
-        timestamp = TIME_T(-1);
+        #pragma HLS INLINE
+        return tuple;
     }
 
-    time_result_t<OP> to_result() const
+    seq_t get_sequence() const
     {
-    #pragma HLS INLINE
-        return time_result_t<OP>(wid, OP::lower(value), timestamp);
+        #pragma HLS INLINE
+        return sequence;
     }
 
-    template <typename KEY_T>
-    keyed_time_result_t<OP, KEY_T> to_result_key(const KEY_T key, const TIME_T sequence) const
+    wid_t get_wid() const
     {
-    #pragma HLS INLINE
-        return keyed_time_result_t<OP, KEY_T>(wid, key, OP::lower(value), timestamp, sequence);
+        #pragma HLS INLINE
+        return wid;
+    }
+
+    timestamp_t get_timestamp() const
+    {
+        #pragma HLS INLINE
+        return timestamp;
     }
 
     #if !defined(__SYNTHESIS__)
-    friend std::ostream & operator<<(std::ostream & os, const time_state_t & state)
+    friend std::ostream & operator<<(std::ostream & os, const TimeWindowResult_t & result)
     {
-        os << "(wid: "        << std::setw(3) << (int)state.wid
-           << ", value: "     << std::setw(3) << state.value
-           << ", timestamp: " << std::setw(3) << (int)state.timestamp << ")";
-
+        os << "("
+           << "key: "       << std::setw(3) << (int)result.key      << ", "
+           << "tuple: "     << result.tuple                         << ", "
+           << "sequence: "  << std::setw(3) << (int)result.sequence << ", "
+           << "wid: "       << std::setw(3) << (int)result.wid      << ", "
+           << "timestamp: " << std::setw(3) << (int)result.timestamp
+           << ")";
         return os;
     }
     #endif
 };
 
+
+//*****************************************************************************
+//
+//
+// WINDOW FORWARD AND FLUSH
+//
+//
+//*****************************************************************************
+
+template <
+    typename wrapper_t,
+    typename stream_in_t,
+    typename stream_out_t
+>
+void WindowForwardFlush (
+    stream_in_t & stream_in,
+    stream_out_t & steram_out
+)
+{
+    using tuple_t = typename stream_in_t::data_t;
+
+    bool last = stream_in.read_eos();
+
+    WindowForward:
+    while (!last) {
+        #pragma HLS PIPELINE II = 1
+        #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+
+        const tuple_t in = stream_in.read();
+        last = stream_in.read_eos();
+
+        const wrapper_t out(in);
+        steram_out.write(out);
+    }
+
+    const wrapper_t out;
+    steram_out.write(out);
+    steram_out.write_eos();
+}
+
+template <
+    typename wrapper_t,
+    unsigned int MAX_KEY,
+    typename key_extractor_t,
+    typename stream_in_t,
+    typename stream_out_t
+>
+void KeyedWindowForwardFlush (
+    stream_in_t & stream_in,
+    stream_out_t & steram_out,
+    key_extractor_t && key_extractor
+)
+{
+    using tuple_t = typename stream_in_t::data_t;
+
+    bool last = stream_in.read_eos();
+
+    KeyedWindowForward:
+    while (!last) {
+        #pragma HLS PIPELINE II = 1
+        #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+
+        const tuple_t in = stream_in.read();
+        last = stream_in.read_eos();
+
+        const key_t key = key_extractor(in);
+        const wrapper_t out(in, key);
+        steram_out.write(out);
+    }
+
+    KeyedWindowFlush:
+    for (unsigned int i = 0; i < MAX_KEY; ++i) {
+    #pragma HLS PIPELINE II = 1
+        const key_t key = i;
+        const wrapper_t out(key);
+        steram_out.write(out);
+    }
+    steram_out.write_eos();
+}
 
 } // namespace fx
 

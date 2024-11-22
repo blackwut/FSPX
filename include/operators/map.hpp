@@ -8,37 +8,38 @@
 namespace fx {
 
 template <
-    typename FUNCTOR_T,
-    typename STREAM_IN,
-    typename STREAM_OUT,
+    typename functor_t,
+    typename stream_in_t,
+    typename stream_out_t,
     typename... Args
 >
-void Map(
-    STREAM_IN & istrm,
-    STREAM_OUT & ostrm,
+void Map (
+    stream_in_t & stream_in,
+    stream_out_t & stream_out,
     Args&&... args
 )
 {
-    using T_IN  = typename STREAM_IN::data_t;
-    using T_OUT = typename STREAM_OUT::data_t;
+    using input_t  = typename stream_in_t::data_t;
+    using output_t = typename stream_out_t::data_t;
 
-    bool last = istrm.read_eos();
+    functor_t func(std::forward<Args>(args)...);
 
-    FUNCTOR_T func(std::forward<Args>(args)...);
+    bool last = stream_in.read_eos();
 
-Map:
+    Map:
     while (!last) {
-    #pragma HLS PIPELINE II = 1
-    #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
-        T_IN in = istrm.read();
-        last = istrm.read_eos();
+        #pragma HLS PIPELINE II = 1
+        #pragma HLS LOOP_TRIPCOUNT min = 1 max = 1024
+        
+        input_t in = stream_in.read();
+        last = stream_in.read_eos();
 
-        T_OUT out;
+        output_t out;
         func(in, out);
 
-        ostrm.write(out);
+        stream_out.write(out);
     }
-    ostrm.write_eos();
+    stream_out.write_eos();
 }
 
 }
