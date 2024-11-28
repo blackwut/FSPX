@@ -39,7 +39,7 @@ struct CountTumbling
         const bool flush = in.is_flush();
 
         valid = state.update(tuple, flush);
-        out = wrapper_result_t(state.state, state.wid, state.count, 0);
+        out = wrapper_result_t(0, state.state, state.wid, state.count);
     }
 };
 
@@ -104,7 +104,7 @@ struct KeyedCountTumbling
         key = tuple_key;
 
         valid = state.update(tuple, flush);
-        out = wrapper_result_t(state.state, state.wid, state.count, key);
+        out = wrapper_result_t(key, state.state, state.wid, state.count);
     }
 };
 
@@ -231,7 +231,7 @@ struct CountSliding
         const state_t & s = state[widx];
 
         valid = valids[widx];
-        out = wrapper_result_t(s.state, s.wid, s.count, 0);
+        out = wrapper_result_t(0, s.state, s.wid, s.count);
 
         if (counter >= counter_t(SIZE - 1)) {
             first_widx.increment();
@@ -359,7 +359,7 @@ struct KeyedCountSliding
         const state_t & s = state[widx];
 
         valid = valids[widx];
-        out = wrapper_result_t(s.state, s.wid, s.count, key);
+        out = wrapper_result_t(key, s.state, s.wid, s.count);
 
         if (count >= counter_t(SIZE - 1)) {
             left_widx.increment();

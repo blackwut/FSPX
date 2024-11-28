@@ -25,7 +25,7 @@ template <
 >
 struct CountBucket_t
 {
-    using count_t = uint_for<SIZE>;
+    using count_t = uint_for<SIZE + 1>;
     using tuple_t = arg_t(0, window_functor_t::operator());
     using result_t = arg_t(1, window_functor_t::operator());
 
@@ -36,13 +36,13 @@ struct CountBucket_t
     CountBucket_t()
     : wid(wid_t(-1))
     , state()
-    , count(count_t(1))
+    , count(count_t(SIZE))
     {}
 
     CountBucket_t(const wid_t wid)
     : wid(wid)
     , state()
-    , count(count_t(1))
+    , count(count_t(SIZE))
     {}
 
     CountBucket_t (
@@ -77,73 +77,105 @@ struct CountBucket_t
     bool is_empty() const
     {
         #pragma HLS INLINE
-        return count == count_t(1);
-    }
-
-    bool is_closing() const
-    {
-        #pragma HLS INLINE
         return count == count_t(SIZE);
-    }
-
-    void increment_count (
-        const bool valid,
-        const unsigned int multiplier = 1
-    )
-    {
-        #pragma HLS INLINE
-        
-        if (valid) {
-            wid += multiplier;
-            count = count_t(1);
-        } else {
-            count++;
-        }
     }
 
     bool update(
         const tuple_t & tuple,
         const bool flush,
-        const unsigned int multiplier = 1
+        const wid_t multiplier = 1
     )
     {
         #pragma HLS INLINE
         
-        static window_functor_t winop;
+        static window_functor_t window_functor;
         const bool empty = is_empty();
+        const bool valid = (SIZE == 1 || count == count_t(SIZE - 1));
 
-        result_t tmp;
-        if (!empty) {
-            tmp = state;
-        } 
-        winop(tuple, tmp);
+        result_t tmp = empty ? result_t() : state;
+        window_functor(tuple, tmp);
 
         if (!flush) {
+            if (count == count_t(SIZE)) {
+                count = count_t(1);
+                wid += multiplier;
+            } else {
+                count++;
+            }
             state = tmp;
         }
 
-        const bool valid = is_closing() || (flush && !empty);
-        increment_count(valid, multiplier);
-        return valid;
+        return valid || (flush && !empty);
     }
 
-    wid_t get_wid() const
-    {
-        #pragma HLS INLINE
-        return wid;
-    }
+    // bool is_closing() const
+    // {
+    //     #pragma HLS INLINE
+    //     return count == count_t(SIZE - 1);
+    // }
 
-    result_t get_result() const
-    {
-        #pragma HLS INLINE
-        return state;
-    }
+    // void increment_count (
+    //     const bool valid,
+    //     const unsigned int multiplier = 1
+    // )
+    // {
+    //     #pragma HLS INLINE
+        
+    //     if (valid) {
+    //         wid += multiplier;
+    //         count = count_t(0);
+    //     } else {
+    //         count++;
+    //     }
+    // }
 
-    count_t get_count() const
-    {
-        #pragma HLS INLINE
-        return count;
-    }
+    // bool update (
+    //     const tuple_t & tuple,
+    //     const bool flush,
+    //     const unsigned int multiplier = 1
+    // )
+    // {
+    //     #pragma HLS INLINE
+        
+    //     static window_functor_t window_functor;
+
+    //     result_t tmp;
+    //     const bool empty = is_empty();
+
+    //     if (!empty) {
+    //         tmp = state;
+    //     } 
+    //     window_functor(tuple, tmp);
+
+    //     if (!flush) {
+    //         state = tmp;
+    //     }
+
+    //     const bool valid = is_closing() || (flush && !empty);
+    //     increment_count(valid, multiplier);
+
+    //     std::cout << count << std::endl;
+
+    //     return valid;
+    // }
+
+    // wid_t get_wid() const
+    // {
+    //     #pragma HLS INLINE
+    //     return wid;
+    // }
+
+    // result_t get_result() const
+    // {
+    //     #pragma HLS INLINE
+    //     return state;
+    // }
+
+    // count_t get_count() const
+    // {
+    //     #pragma HLS INLINE
+    //     return count;
+    // }
 
     #if !defined(__SYNTHESIS__)
     friend std::ostream & operator<<(std::ostream & os, const CountBucket_t & state)
@@ -171,7 +203,7 @@ struct CountWindowWrapper_t
     bool flush;
 
     CountWindowWrapper_t()
-    : key(-1)
+    : key(-1) // TODO: verify that -1 is ok or put back 0
     , tuple()
     , flush(true)
     {}
@@ -182,9 +214,15 @@ struct CountWindowWrapper_t
     , flush(true)
     {}
 
+    CountWindowWrapper_t(const tuple_t & tuple)
+    : key(-1)
+    , tuple(tuple)
+    , flush(false)
+    {}
+
     CountWindowWrapper_t (
         const key_t key,
-        const tuple_t & tuple,
+        const tuple_t tuple
     )
     : key(key)
     , tuple(tuple)
@@ -223,6 +261,12 @@ struct CountWindowWrapper_t
         return tuple;
     }
 
+    const tuple_t & unwrap()
+    {
+        #pragma HLS INLINE
+        return tuple;
+    }
+
     bool is_flush() const
     {
         #pragma HLS INLINE
@@ -249,7 +293,7 @@ template <
 struct CountWindowResult_t
 {
     using tuple_t = T;
-    using count_t = uint_for<SIZE>;
+    using count_t = uint_for<SIZE + 1>;
 
     key_t key;
     tuple_t tuple;
@@ -381,8 +425,8 @@ struct TimeBucket_t
         result_t tmp = wid != new_wid ? result_t() : state;
         window_functor(tuple, tmp);
 
-        s.wid = new_wid;
-        s.state = tmp;
+        wid = new_wid;
+        state = tmp;
     }
 
     #if !defined(__SYNTHESIS__)
@@ -471,7 +515,7 @@ struct TimeWindowWrapper_t
         return *this;
     }
 
-    key_t & get_key() const
+    key_t get_key() const
     {
         #pragma HLS INLINE
         return key;

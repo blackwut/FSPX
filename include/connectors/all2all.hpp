@@ -84,7 +84,7 @@ void Emitter (
 //******************************************************************************
 
 template <
-    operator_t operator,
+    operator_t op,
     typename functor_t,
     policy_t policy_in,
     policy_t policy_out,
@@ -116,11 +116,11 @@ void ReplicateOperator (
 
     HW_STATIC_ASSERT(
         (
-            operator == MAP ||
-            operator == FILTER ||
-            operator == FLATMAP
+            op == MAP ||
+            op == FILTER ||
+            op == FLATMAP
         ),
-        "FX: fx::A2A::ReplicateOperator operator supports MAP, FILTER and FLATMAP operators only!"
+        "FX: fx::A2A::ReplicateOperator op supports MAP, FILTER and FLATMAP operators only!"
     );
 
     HW_STATIC_ASSERT(
@@ -146,11 +146,11 @@ void ReplicateOperator (
         fx::SNMtoS_KB<N, M>(istrms, snm_to_op, m, std::forward<key_generator_t>(key_generator), "ReplicateOperator_IN_POLICY_KB");
     }
 
-    if (operator == MAP) {
+    if (op == MAP) {
         fx::Map<functor_t>(snm_to_op, op_to_smk);
-    } else if (operator == FILTER) {
+    } else if (op == FILTER) {
         fx::Filter<functor_t>(snm_to_op, op_to_smk);
-    } else if (operator == FLATMAP) {
+    } else if (op == FLATMAP) {
         fx::FlatMap<functor_t>(snm_to_op, op_to_smk);
     }
 
@@ -166,7 +166,7 @@ void ReplicateOperator (
 }
 
 template <
-    operator_t operator,
+    operator_t op,
     typename functor_t,
     policy_t policy_in,
     policy_t policy_out,
@@ -197,11 +197,11 @@ void Operator (
 
     HW_STATIC_ASSERT(
         (
-            operator == MAP ||
-            operator == FILTER ||
-            operator == FLATMAP
+            op == MAP ||
+            op == FILTER ||
+            op == FLATMAP
         ),
-        "FX: fx::A2A::Operator operator supports MAP, FILTER and FLATMAP operators only!"
+        "FX: fx::A2A::Operator op supports MAP, FILTER and FLATMAP operators only!"
     );
 
     HW_STATIC_ASSERT(
@@ -219,7 +219,7 @@ void Operator (
     for (int i = 0; i < M; ++i) {
         #pragma HLS UNROLL
         
-        ReplicateOperator<operator, functor_t, policy_in, policy_out, N, M, K>(
+        ReplicateOperator<op, functor_t, policy_in, policy_out, N, M, K>(
             istrms, ostrms[i], i, std::forward<key_extractor_t>(key_extractor), std::forward<key_generator_t>(key_generator)
         );
     }

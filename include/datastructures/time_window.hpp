@@ -22,7 +22,7 @@ struct TimeTumbling
 
     using widx_t = uint_for<N>;
 
-    using state_t = time_bucket_t<window_functor_t>;
+    using state_t = TimeBucket_t<window_functor_t>;
     using tuple_t = typename state_t::tuple_t;
     using result_t = typename state_t::result_t;
 
@@ -95,7 +95,7 @@ struct KeyedTimeTumbling
 
     using widx_t = uint_for<N>;
 
-    using state_t = time_bucket_t<window_functor_t>;
+    using state_t = TimeBucket_t<window_functor_t>;
     using tuple_t = typename state_t::tuple_t;
     using result_t = typename state_t::result_t;
 
@@ -214,7 +214,7 @@ struct TimeSliding
 
     using widx_t = uint_for<N>;
 
-    using state_t = time_bucket_t<window_functor_t>;
+    using state_t = TimeBucket_t<window_functor_t>;
     using tuple_t = typename state_t::tuple_t;
     using result_t = typename state_t::result_t;
 
@@ -314,7 +314,7 @@ struct KeyedTimeSliding
 
     using widx_t = uint_for<N>;
 
-    using state_t = time_bucket_t<window_functor_t>;
+    using state_t = TimeBucket_t<window_functor_t>;
     using tuple_t = typename state_t::tuple_t;
     using result_t = typename state_t::result_t;
 

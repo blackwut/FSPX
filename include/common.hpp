@@ -4,6 +4,7 @@
 #include <iostream>
 #include <type_traits>
 #include <limits>
+#include "ap_int.h"
 
 #define UNUSED(x) (void)(x)
 #define REMOVE_INIT(x) union { x; }
@@ -135,7 +136,7 @@ void print_array(std::string name, const T * array, const unsigned int size)
 namespace fx {
 
 template <unsigned int MAX_VALUE>
-using uint_for<MAX_VALUE> = ap_uint<LOG2_CEIL<MAX_VALUE> + (MAX_VALUE == 1)>;
+using uint_for = ap_uint<LOG2_CEIL(MAX_VALUE) + (MAX_VALUE == 1)>;
 
 template <unsigned int MAX_VALUE>
 std::enable_if_t<IS_POW2<MAX_VALUE>, void>
