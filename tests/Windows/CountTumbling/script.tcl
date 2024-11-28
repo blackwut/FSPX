@@ -1,6 +1,7 @@
 open_project -reset kernel
 
-set WF_DIR "/home/blackuntu/projects/FSPX"
+set HOME $env(HOME)
+set WF_DIR "$HOME/projects/FSPX"
 set WF_INCLUDE "$WF_DIR/include"
 set COMMON "$WF_DIR/tests/Windows/common"
 
